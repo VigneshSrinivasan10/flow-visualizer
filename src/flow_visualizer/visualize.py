@@ -5,9 +5,11 @@ from pathlib import Path
 
 import hydra
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation, PillowWriter
 import numpy as np
 import torch
 from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
 
 from flow_visualizer.data import generate_trex_data
 from flow_visualizer.model import FlowMatchingModel, MLPVelocityNet
@@ -192,6 +194,370 @@ def plot_vector_field(
     plt.close()
 
 
+def create_flow_animation(
+    trajectory: list[torch.Tensor],
+    target_data: np.ndarray,
+    save_path: Path,
+    fps: int = 20,
+    dpi: int = 100,
+    subsample: int = 1,
+):
+    """
+    Create an animated GIF showing the flow from Gaussian noise to target distribution.
+
+    Args:
+        trajectory: List of tensors representing the sampling trajectory
+        target_data: Target data distribution
+        save_path: Path to save the GIF
+        fps: Frames per second for the animation
+        dpi: DPI for the output GIF
+        subsample: Use every Nth frame to reduce file size (default: 1 = all frames)
+    """
+    # Subsample trajectory if requested
+    trajectory_subset = trajectory[::subsample]
+    n_frames = len(trajectory_subset)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    def update(frame):
+        ax.clear()
+        data = trajectory_subset[frame].numpy()
+        t = (frame * subsample) / (len(trajectory) - 1)
+
+        # Plot current distribution
+        ax.scatter(
+            data[:, 0],
+            data[:, 1],
+            alpha=0.6,
+            s=20,
+            color="blue",
+            edgecolors="darkblue",
+            linewidth=0.5,
+        )
+
+        # Plot target distribution (faded)
+        ax.scatter(
+            target_data[:, 0],
+            target_data[:, 1],
+            alpha=0.1,
+            s=5,
+            color="red",
+        )
+
+        # Add title with time
+        ax.set_title(f"Flow Matching: t = {t:.3f}\nGaussian → T-Rex", fontsize=16, fontweight="bold")
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect("equal")
+        ax.grid(True, alpha=0.3)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+
+    logger.info(f"Creating flow animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    # Save as GIF
+    writer = PillowWriter(fps=fps)
+    anim.save(save_path, writer=writer, dpi=dpi)
+    logger.info(f"Flow animation saved to {save_path}")
+    plt.close()
+
+
+def create_particle_trajectories_animation(
+    trajectory: list[torch.Tensor],
+    target_data: np.ndarray,
+    save_path: Path,
+    n_particles: int = 100,
+    fps: int = 20,
+    dpi: int = 100,
+    subsample: int = 1,
+    trail_length: int = 10,
+):
+    """
+    Create an animated GIF showing individual particle trajectories through the flow.
+
+    Args:
+        trajectory: List of tensors representing the sampling trajectory
+        target_data: Target data distribution
+        save_path: Path to save the GIF
+        n_particles: Number of particle trajectories to visualize
+        fps: Frames per second for the animation
+        dpi: DPI for the output GIF
+        subsample: Use every Nth frame to reduce file size
+        trail_length: Number of previous positions to show as trails
+    """
+    # Subsample trajectory and select particles
+    trajectory_subset = trajectory[::subsample]
+    n_frames = len(trajectory_subset)
+
+    # Select random particles to track
+    n_samples = trajectory_subset[0].shape[0]
+    particle_indices = np.random.choice(n_samples, size=n_particles, replace=False)
+
+    # Extract particle paths
+    particle_paths = []
+    for idx in particle_indices:
+        path = np.array([traj[idx].numpy() for traj in trajectory_subset])
+        particle_paths.append(path)
+    particle_paths = np.array(particle_paths)  # Shape: (n_particles, n_frames, 2)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Color map for particles
+    colors = plt.cm.viridis(np.linspace(0, 1, n_particles))
+
+    def update(frame):
+        ax.clear()
+        t = (frame * subsample) / (len(trajectory) - 1)
+
+        # Plot target distribution (very faded)
+        ax.scatter(
+            target_data[:, 0],
+            target_data[:, 1],
+            alpha=0.05,
+            s=3,
+            color="gray",
+        )
+
+        # Plot particle trails and current positions
+        for i, path in enumerate(particle_paths):
+            # Trail
+            start_idx = max(0, frame - trail_length)
+            trail = path[start_idx : frame + 1]
+
+            if len(trail) > 1:
+                ax.plot(
+                    trail[:, 0],
+                    trail[:, 1],
+                    alpha=0.4,
+                    linewidth=1.5,
+                    color=colors[i],
+                )
+
+            # Current position
+            ax.scatter(
+                path[frame, 0],
+                path[frame, 1],
+                s=50,
+                color=colors[i],
+                edgecolors="black",
+                linewidth=1,
+                zorder=10,
+            )
+
+        ax.set_title(
+            f"Particle Trajectories: t = {t:.3f}\n{n_particles} particles flowing from noise to data",
+            fontsize=14,
+            fontweight="bold",
+        )
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect("equal")
+        ax.grid(True, alpha=0.3)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+
+    logger.info(f"Creating particle trajectories animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    writer = PillowWriter(fps=fps)
+    anim.save(save_path, writer=writer, dpi=dpi)
+    logger.info(f"Particle trajectories animation saved to {save_path}")
+    plt.close()
+
+
+def create_density_animation(
+    trajectory: list[torch.Tensor],
+    target_data: np.ndarray,
+    save_path: Path,
+    fps: int = 20,
+    dpi: int = 100,
+    subsample: int = 1,
+    grid_size: int = 100,
+):
+    """
+    Create an animated GIF showing the density evolution using heatmaps.
+
+    Args:
+        trajectory: List of tensors representing the sampling trajectory
+        target_data: Target data distribution
+        save_path: Path to save the GIF
+        fps: Frames per second for the animation
+        dpi: DPI for the output GIF
+        subsample: Use every Nth frame to reduce file size
+        grid_size: Resolution of the density grid
+    """
+    from scipy.stats import gaussian_kde
+
+    trajectory_subset = trajectory[::subsample]
+    n_frames = len(trajectory_subset)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Create grid for density estimation
+    x = np.linspace(-1.5, 1.5, grid_size)
+    y = np.linspace(-1.5, 1.5, grid_size)
+    X, Y = np.meshgrid(x, y)
+    positions = np.vstack([X.ravel(), Y.ravel()])
+
+    def update(frame):
+        ax.clear()
+        data = trajectory_subset[frame].numpy()
+        t = (frame * subsample) / (len(trajectory) - 1)
+
+        # Compute density using KDE
+        try:
+            kde = gaussian_kde(data.T)
+            Z = kde(positions).reshape(grid_size, grid_size)
+
+            # Plot density heatmap
+            im = ax.contourf(X, Y, Z, levels=20, cmap="Blues", alpha=0.8)
+
+            # Overlay scatter plot
+            ax.scatter(
+                data[:, 0],
+                data[:, 1],
+                alpha=0.3,
+                s=5,
+                color="darkblue",
+            )
+
+        except np.linalg.LinAlgError:
+            # Fallback if KDE fails (e.g., all points identical)
+            ax.scatter(
+                data[:, 0],
+                data[:, 1],
+                alpha=0.5,
+                s=10,
+                color="blue",
+            )
+
+        # Plot target distribution outline
+        ax.scatter(
+            target_data[:, 0],
+            target_data[:, 1],
+            alpha=0.1,
+            s=2,
+            color="red",
+        )
+
+        ax.set_title(
+            f"Density Evolution: t = {t:.3f}\nGaussian → T-Rex Distribution",
+            fontsize=14,
+            fontweight="bold",
+        )
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect("equal")
+        ax.grid(True, alpha=0.3)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+
+    logger.info(f"Creating density animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    writer = PillowWriter(fps=fps)
+    anim.save(save_path, writer=writer, dpi=dpi)
+    logger.info(f"Density animation saved to {save_path}")
+    plt.close()
+
+
+def create_vector_field_animation(
+    model: FlowMatchingModel,
+    trajectory: list[torch.Tensor],
+    target_data: np.ndarray,
+    save_path: Path,
+    fps: int = 20,
+    dpi: int = 100,
+    subsample: int = 1,
+    grid_size: int = 20,
+):
+    """
+    Create an animated GIF showing the flow with vector field overlay.
+
+    Args:
+        model: Trained FlowMatching model
+        trajectory: List of tensors representing the sampling trajectory
+        target_data: Target data distribution
+        save_path: Path to save the GIF
+        fps: Frames per second for the animation
+        dpi: DPI for the output GIF
+        subsample: Use every Nth frame to reduce file size
+        grid_size: Resolution of the vector field grid
+    """
+    trajectory_subset = trajectory[::subsample]
+    n_frames = len(trajectory_subset)
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    # Create grid for vector field
+    x = np.linspace(-1.5, 1.5, grid_size)
+    y = np.linspace(-1.5, 1.5, grid_size)
+    X, Y = np.meshgrid(x, y)
+    positions = np.stack([X.flatten(), Y.flatten()], axis=1)
+
+    model.velocity_net.eval()
+    device = next(model.velocity_net.parameters()).device
+
+    def update(frame):
+        ax.clear()
+        data = trajectory_subset[frame].numpy()
+        t = (frame * subsample) / (len(trajectory) - 1)
+
+        # Compute velocity field at current time
+        with torch.no_grad():
+            pos_tensor = torch.from_numpy(positions).float().to(device)
+            t_tensor = torch.ones(len(positions), 1, device=device) * t
+            velocities = model.velocity_net(pos_tensor, t_tensor).cpu().numpy()
+
+        U = velocities[:, 0].reshape(grid_size, grid_size)
+        V = velocities[:, 1].reshape(grid_size, grid_size)
+
+        # Plot vector field
+        ax.quiver(X, Y, U, V, alpha=0.3, scale=20, color="gray")
+
+        # Plot current distribution
+        ax.scatter(
+            data[:, 0],
+            data[:, 1],
+            alpha=0.6,
+            s=15,
+            color="blue",
+            edgecolors="darkblue",
+            linewidth=0.5,
+            zorder=10,
+        )
+
+        # Plot target distribution (faded)
+        ax.scatter(
+            target_data[:, 0],
+            target_data[:, 1],
+            alpha=0.1,
+            s=3,
+            color="red",
+        )
+
+        ax.set_title(
+            f"Flow with Velocity Field: t = {t:.3f}\nBlue = Generated | Red = Target | Arrows = Learned Velocity",
+            fontsize=12,
+            fontweight="bold",
+        )
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect("equal")
+        ax.grid(True, alpha=0.3)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+
+    logger.info(f"Creating vector field animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    writer = PillowWriter(fps=fps)
+    anim.save(save_path, writer=writer, dpi=dpi)
+    logger.info(f"Vector field animation saved to {save_path}")
+    plt.close()
+
+
 @hydra.main(version_base=None, config_path="/home/user/flow-visualizer/conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     """Main visualization function."""
@@ -266,7 +632,53 @@ def main(cfg: DictConfig) -> None:
         grid_size=cfg.visualization.grid_size,
     )
 
-    logger.info("Visualization complete!")
+    # Create animations
+    logger.info("Creating flow animation...")
+    create_flow_animation(
+        trajectory,
+        target_data[:n_vis_samples],
+        output_dir / "flow_animation.gif",
+        fps=cfg.visualization.get("animation_fps", 20),
+        dpi=cfg.visualization.get("animation_dpi", 100),
+        subsample=cfg.visualization.get("animation_subsample", 1),
+    )
+
+    logger.info("Creating particle trajectories animation...")
+    create_particle_trajectories_animation(
+        trajectory,
+        target_data[:n_vis_samples],
+        output_dir / "particle_trajectories.gif",
+        n_particles=cfg.visualization.get("n_particles", 100),
+        fps=cfg.visualization.get("animation_fps", 20),
+        dpi=cfg.visualization.get("animation_dpi", 100),
+        subsample=cfg.visualization.get("animation_subsample", 1),
+        trail_length=cfg.visualization.get("trail_length", 10),
+    )
+
+    logger.info("Creating density animation...")
+    create_density_animation(
+        trajectory,
+        target_data[:n_vis_samples],
+        output_dir / "density_animation.gif",
+        fps=cfg.visualization.get("animation_fps", 20),
+        dpi=cfg.visualization.get("animation_dpi", 100),
+        subsample=cfg.visualization.get("animation_subsample", 1),
+        grid_size=cfg.visualization.get("density_grid_size", 100),
+    )
+
+    logger.info("Creating vector field animation...")
+    create_vector_field_animation(
+        model,
+        trajectory,
+        target_data[:n_vis_samples],
+        output_dir / "vector_field_animation.gif",
+        fps=cfg.visualization.get("animation_fps", 20),
+        dpi=cfg.visualization.get("animation_dpi", 100),
+        subsample=cfg.visualization.get("animation_subsample", 1),
+        grid_size=cfg.visualization.get("grid_size", 20),
+    )
+
+    logger.info("Visualization complete! Generated static plots and animated GIFs.")
 
 
 if __name__ == "__main__":

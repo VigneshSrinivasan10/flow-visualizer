@@ -11,9 +11,12 @@ This project is inspired by [Diffusion-Explorer](https://github.com/helblazer811
 - **Fast Training**: Optimized learning rate (0.003) for quick convergence in ~300 epochs
 - **Interactive Training**: Train models with Hydra configuration management
 - **Rich Visualizations**:
-  - Trajectory plots showing evolution from noise to data
-  - Comparison plots between target and generated distributions
-  - Vector field plots showing learned velocity fields
+  - Static plots showing trajectory evolution, comparisons, and vector fields
+  - **Animated GIFs** showing the flow from Gaussian noise to data distribution:
+    - **Flow animation**: Watch the entire distribution transform over time
+    - **Particle trajectories**: Track individual particles flowing from noise to structure
+    - **Density evolution**: Heatmap visualization of probability density changes
+    - **Vector field animation**: See the learned velocity field guide the flow
 
 ## Installation
 
@@ -95,16 +98,27 @@ Key configuration parameters in `conf/config.yaml`:
 **Visualization**:
 - `visualization.n_sampling_steps`: Number of sampling steps (default: 100)
 - `visualization.grid_size`: Vector field grid resolution (default: 20)
+- `visualization.animation_fps`: Frames per second for GIF animations (default: 20)
+- `visualization.animation_dpi`: DPI for GIF output quality (default: 100)
+- `visualization.animation_subsample`: Use every Nth frame to reduce file size (default: 1)
+- `visualization.n_particles`: Number of particle trajectories to visualize (default: 100)
+- `visualization.trail_length`: Length of particle trails in frames (default: 10)
+- `visualization.density_grid_size`: Resolution for density heatmap (default: 100)
 
 ## Output
 
 After running training and visualization, you'll find:
 
 - **Models**: `outputs/models/velocity_net.pt` - Trained model weights
-- **Visualizations**:
+- **Static Visualizations**:
   - `outputs/visualizations/comparison.png` - Target vs Generated comparison
   - `outputs/visualizations/trajectory.png` - Sampling trajectory evolution
   - `outputs/visualizations/vector_field.png` - Learned velocity fields
+- **Animated GIFs** (the cool part! 🎬):
+  - `outputs/visualizations/flow_animation.gif` - Full distribution flowing from Gaussian to T-Rex
+  - `outputs/visualizations/particle_trajectories.gif` - Individual particles with trails showing their paths
+  - `outputs/visualizations/density_animation.gif` - Heatmap showing probability density evolution
+  - `outputs/visualizations/vector_field_animation.gif` - Distribution flow with velocity field overlay
 
 ## How It Works
 
