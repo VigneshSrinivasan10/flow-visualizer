@@ -1,0 +1,27 @@
+[project]
+name = "flow-visualizer"
+version = "0.1.0"
+description = "Simplified diffusion model training and visualization with Flow Matching"
+requires-python = ">=3.11"
+dependencies = [
+    "hydra-core>=1.3.2",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.1",
+    "scipy>=1.17.0",
+    "torch>=2.9.1",
+    "tqdm>=4.67.1",
+]
+
+[project.scripts]
+flow-visualizer = "main:main"
+fv-train = "flow_visualizer.train:main"
+fv-visualize = "flow_visualizer.visualize:main"
+
+[tool.uv]
+package = true
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
