@@ -26,3 +26,10 @@ visualization:
   n_sampling_steps: 100
   output_dir: outputs/visualizations
   grid_size: 20
+  # Animation settings
+  animation_fps: 20  # Frames per second for GIF animations
+  animation_dpi: 100  # DPI for GIF output (higher = larger file size)
+  animation_subsample: 1  # Use every Nth frame (1 = all frames, 2 = every other frame)
+  n_particles: 100  # Number of particle trajectories to visualize
+  trail_length: 10  # Length of particle trails in frames
+  density_grid_size: 100  # Resolution for density heatmap
