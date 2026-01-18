@@ -1,7 +1,32 @@
 """Flow Matching model for 2D data generation."""
 
+import math
+
 import torch
 import torch.nn as nn
+
+
+class SinusoidalPositionEmbeddings(nn.Module):
+    """Sinusoidal positional embeddings for time conditioning."""
+
+    def __init__(self, dim: int, max_period: float = 10000.0):
+        super().__init__()
+        self.dim = dim
+        self.max_period = max_period
+
+    def forward(self, t: torch.Tensor) -> torch.Tensor:
+        device = t.device
+        half_dim = self.dim // 2
+        # Scale t from [0,1] to [0,1000] for better frequency coverage
+        t_scaled = t * 1000.0
+        freqs = torch.exp(
+            -math.log(self.max_period)
+            * torch.arange(half_dim, device=device, dtype=torch.float32)
+            / half_dim
+        )
+        args = t_scaled * freqs
+        embeddings = torch.cat((args.sin(), args.cos()), dim=-1)
+        return embeddings
 
 
 class MLPVelocityNet(nn.Module):
@@ -29,9 +54,10 @@ class MLPVelocityNet(nn.Module):
         self.data_dim = data_dim
         self.time_embed_dim = time_embed_dim
 
-        # Time embedding layers
+        # Sinusoidal time embedding + MLP projection
+        self.time_embed = SinusoidalPositionEmbeddings(time_embed_dim)
         self.time_mlp = nn.Sequential(
-            nn.Linear(1, time_embed_dim),
+            nn.Linear(time_embed_dim, time_embed_dim),
             nn.SiLU(),
             nn.Linear(time_embed_dim, time_embed_dim),
         )
@@ -62,8 +88,9 @@ class MLPVelocityNet(nn.Module):
         Returns:
             Predicted velocity of shape (batch_size, data_dim)
         """
-        # Embed time
-        t_embed = self.time_mlp(t)
+        # Sinusoidal time embedding
+        t_embed = self.time_embed(t)
+        t_embed = self.time_mlp(t_embed)
 
         # Concatenate x and time embedding
         h = torch.cat([x, t_embed], dim=-1)

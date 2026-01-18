@@ -3,7 +3,7 @@
 # Data settings
 data:
   n_samples: 10000
-  noise: 0.02
+  noise: 0.15
 
 # Model settings
 model:
@@ -15,8 +15,8 @@ model:
 training:
   n_epochs: 1000
   batch_size: 256
-  learning_rate: 0.003
-  weight_decay: 0.0005
+  learning_rate: 1e-3
+  weight_decay: 0.0
   beta1: 0.9
   beta2: 0.999
   device: cpu 

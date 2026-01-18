@@ -71,9 +71,10 @@ def generate_trex_data(n_samples: int, noise: float = 0.02) -> np.ndarray:
         [44.1026, 92.6923],
     ])
     
-    # Center and normalize to [-1, 1] range
-    dino_points = dino_points - dino_points.mean(axis=0)
-    dino_points = dino_points / np.abs(dino_points).max()
+    # Normalize to [-4, 4] range (same as tiny-diffusion)
+    # Original dino x range ~22-98, y range ~2-99
+    dino_points[:, 0] = (dino_points[:, 0] / 54 - 1) * 4
+    dino_points[:, 1] = (dino_points[:, 1] / 48 - 1) * 4
     
     # Sample with replacement to get n_samples points
     indices = np.random.choice(len(dino_points), n_samples, replace=True)
@@ -98,6 +99,57 @@ class TRexDataset(Dataset):
         """
         self.data = torch.from_numpy(
             generate_trex_data(n_samples, noise)
+        )
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+
+def generate_spiral_data(n_samples: int, noise: float = 0.1) -> np.ndarray:
+    """
+    Generate 2D two-spiral dataset.
+
+    Args:
+        n_samples: Total number of samples to generate
+        noise: Amount of Gaussian noise to add
+
+    Returns:
+        Array of shape (n_samples, 2) containing 2D points
+    """
+    n_per_spiral = n_samples // 2
+
+    # First spiral
+    theta1 = np.linspace(0, 3 * np.pi, n_per_spiral)
+    r1 = theta1 / (3 * np.pi) * 3
+    x1 = r1 * np.cos(theta1)
+    y1 = r1 * np.sin(theta1)
+
+    # Second spiral (rotated by pi)
+    theta2 = np.linspace(0, 3 * np.pi, n_samples - n_per_spiral)
+    r2 = theta2 / (3 * np.pi) * 3
+    x2 = r2 * np.cos(theta2 + np.pi)
+    y2 = r2 * np.sin(theta2 + np.pi)
+
+    # Combine
+    x = np.concatenate([x1, x2])
+    y = np.concatenate([y1, y2])
+    data = np.stack([x, y], axis=1)
+
+    # Add noise
+    data += noise * np.random.randn(*data.shape)
+
+    return data.astype(np.float32)
+
+
+class SpiralDataset(Dataset):
+    """PyTorch dataset for two-spiral data."""
+
+    def __init__(self, n_samples: int = 10000, noise: float = 0.1):
+        self.data = torch.from_numpy(
+            generate_spiral_data(n_samples, noise)
         )
 
     def __len__(self):
