@@ -7,15 +7,10 @@ from torch.utils.data import Dataset
 
 def generate_trex_data(n_samples: int, noise: float = 0.02) -> np.ndarray:
     """
-    Generate 2D T-Rex shaped dataset inspired by Google Chrome T-Rex runner game.
+    Generate 2D dinosaur shaped dataset from the Datasaurus Dozen.
 
-    The T-Rex has a pixelated, blocky appearance with:
-    - Large rectangular head with an eye
-    - Short thick neck
-    - Rounded body
-    - Tiny arms
-    - Strong legs with feet
-    - Horizontal tail
+    Uses the original dino dataset from Alberto Cairo / Justin Matejka.
+    See: https://jumpingrivers.github.io/datasauRus/
 
     Args:
         n_samples: Total number of samples to generate
@@ -24,118 +19,68 @@ def generate_trex_data(n_samples: int, noise: float = 0.02) -> np.ndarray:
     Returns:
         Array of shape (n_samples, 2) containing 2D points
     """
-    points = []
-
-    # Define Chrome T-Rex outline with blocky/pixelated body parts
-    # Each part gets a proportion of the total samples
-
-    # Head (blocky rectangular with rounded top) - 18%
-    n_head = int(0.18 * n_samples)
-    # Create blocky head shape
-    head_top = int(n_head * 0.3)
-    head_back = int(n_head * 0.2)
-    head_front = int(n_head * 0.3)
-    head_jaw = int(n_head * 0.2)
-
-    head_x = np.concatenate([
-        np.linspace(0.5, 0.8, head_top),      # top of head
-        np.full(head_back, 0.5),              # back of head
-        np.linspace(0.5, 0.9, head_front),    # front/snout
-        np.linspace(0.9, 0.6, head_jaw)       # jaw line
+    # Original Datasaurus dino coordinates
+    dino_points = np.array([
+        [55.3846, 97.1795], [51.5385, 96.0256], [46.1538, 94.4872],
+        [42.8205, 91.4103], [40.7692, 88.3333], [38.7179, 84.8718],
+        [35.641, 79.8718], [33.0769, 77.5641], [28.9744, 74.4872],
+        [26.1538, 71.4103], [23.0769, 66.4103], [22.3077, 61.7949],
+        [22.3077, 57.1795], [23.3333, 52.9487], [25.8974, 51.0256],
+        [29.4872, 51.0256], [32.8205, 51.0256], [35.3846, 51.4103],
+        [40.2564, 51.4103], [44.1026, 52.9487], [46.6667, 54.1026],
+        [50.0, 55.2564], [53.0769, 55.641], [56.6667, 56.0256],
+        [59.2308, 57.9487], [61.2821, 62.1795], [61.5385, 66.4103],
+        [61.7949, 69.1026], [57.4359, 55.2564], [54.8718, 49.8718],
+        [52.5641, 46.0256], [48.2051, 38.3333], [49.4872, 42.1795],
+        [51.0256, 44.1026], [45.3846, 36.4103], [42.8205, 32.5641],
+        [38.7179, 31.4103], [35.1282, 30.2564], [32.5641, 32.1795],
+        [30.0, 36.7949], [33.5897, 41.4103], [36.6667, 45.641],
+        [38.2051, 49.1026], [29.7436, 36.0256], [29.7436, 32.1795],
+        [30.0, 29.1026], [32.0513, 26.7949], [35.8974, 25.2564],
+        [41.0256, 25.2564], [44.1026, 25.641], [47.1795, 28.718],
+        [49.4872, 31.4103], [51.5385, 34.8718], [53.5897, 37.5641],
+        [55.1282, 40.641], [56.6667, 42.1795], [59.2308, 44.4872],
+        [62.3077, 46.0256], [64.8718, 46.7949], [67.9487, 47.9487],
+        [70.5128, 53.718], [71.5385, 60.641], [71.5385, 64.4872],
+        [69.4872, 69.4872], [46.9231, 79.8718], [48.2051, 84.1026],
+        [50.0, 85.2564], [53.0769, 85.2564], [55.3846, 86.0256],
+        [56.6667, 86.0256], [56.1538, 82.9487], [53.8462, 80.641],
+        [51.2821, 78.718], [50.0, 78.718], [47.9487, 77.5641],
+        [29.7436, 59.8718], [29.7436, 62.1795], [31.2821, 62.5641],
+        [57.9487, 99.4872], [61.7949, 99.1026], [64.8718, 97.5641],
+        [68.4615, 94.1026], [70.7692, 91.0256], [72.0513, 86.4103],
+        [73.8462, 83.3333], [75.1282, 79.1026], [76.6667, 75.2564],
+        [77.6923, 71.4103], [79.7436, 66.7949], [81.7949, 60.2564],
+        [83.3333, 55.2564], [85.1282, 51.4103], [86.4103, 47.5641],
+        [87.9487, 46.0256], [89.4872, 42.5641], [93.3333, 39.8718],
+        [95.3846, 36.7949], [98.2051, 33.718], [56.6667, 40.641],
+        [59.2308, 38.3333], [60.7692, 33.718], [63.0769, 29.1026],
+        [64.1026, 25.2564], [64.359, 24.1026], [74.359, 22.9487],
+        [71.2821, 22.9487], [67.9487, 22.1795], [65.8974, 20.2564],
+        [63.0769, 19.1026], [61.2821, 19.1026], [58.7179, 18.3333],
+        [55.1282, 18.3333], [52.3077, 18.3333], [49.7436, 17.5641],
+        [47.4359, 16.0256], [44.8718, 13.718], [48.7179, 14.8718],
+        [51.2821, 14.8718], [54.1026, 14.8718], [56.1538, 14.1026],
+        [52.0513, 12.5641], [48.7179, 11.0256], [47.1795, 9.8718],
+        [46.1538, 6.0256], [50.5128, 9.4872], [53.8462, 10.2564],
+        [57.4359, 10.2564], [60.0, 10.641], [64.1026, 10.641],
+        [66.9231, 10.641], [71.2821, 10.641], [74.359, 10.641],
+        [78.2051, 10.641], [67.9487, 8.718], [68.4615, 5.2564],
+        [68.2051, 2.9487], [37.6923, 25.7692], [39.4872, 25.3846],
+        [91.2821, 41.5385], [50.0, 95.7692], [47.9487, 95.0],
+        [44.1026, 92.6923],
     ])
-    head_y = np.concatenate([
-        np.full(head_top, 0.7),                           # top flat
-        np.linspace(0.7, 0.4, head_back),                # back edge
-        np.linspace(0.6, 0.5, head_front),               # snout slope
-        np.full(head_jaw, 0.4)                           # jaw flat
-    ])
-
-    # Eye (small dot) - 2%
-    n_eye = int(0.02 * n_samples)
-    eye_x = 0.7 + 0.03 * np.cos(np.linspace(0, 2*np.pi, n_eye))
-    eye_y = 0.62 + 0.03 * np.sin(np.linspace(0, 2*np.pi, n_eye))
-
-    # Neck (short and thick) - 8%
-    n_neck = int(0.08 * n_samples)
-    neck_x = np.linspace(0.55, 0.35, n_neck)
-    neck_y = np.linspace(0.4, 0.25, n_neck)
-
-    # Body (rounded, egg-like) - 16%
-    n_body = int(0.16 * n_samples)
-    t_body = np.linspace(0, 2 * np.pi, n_body)
-    body_x = 0.1 + 0.3 * np.cos(t_body)
-    body_y = 0.05 + 0.35 * np.sin(t_body)
-
-    # Tail (horizontal, tapering, slightly lifted) - 14%
-    n_tail = int(0.14 * n_samples)
-    t_tail = np.linspace(0, 1, n_tail)
-    tail_x = -0.2 - 0.7 * t_tail
-    # Tail curves up slightly and tapers
-    tail_thickness = (1 - t_tail * 0.8)
-    tail_y_upper = 0.15 + 0.1 * t_tail + 0.08 * tail_thickness
-    tail_y_lower = 0.15 + 0.1 * t_tail - 0.08 * tail_thickness
-
-    # Combine upper and lower tail edges
-    tail_x = np.concatenate([tail_x, tail_x[::-1]])
-    tail_y = np.concatenate([tail_y_upper, tail_y_lower[::-1]])
-
-    # Back leg (thick, strong, bent) - 13%
-    n_leg1 = int(0.13 * n_samples)
-    leg1_upper = int(n_leg1 * 0.4)
-    leg1_lower = int(n_leg1 * 0.4)
-    leg1_foot = n_leg1 - leg1_upper - leg1_lower
-
-    leg1_x = np.concatenate([
-        np.linspace(-0.05, 0.0, leg1_upper),      # thigh
-        np.linspace(0.0, 0.05, leg1_lower),       # shin/calf
-        np.linspace(0.05, 0.15, leg1_foot)        # foot
-    ])
-    leg1_y = np.concatenate([
-        np.linspace(0.0, -0.35, leg1_upper),
-        np.linspace(-0.35, -0.65, leg1_lower),
-        np.full(leg1_foot, -0.65)                  # foot flat on ground
-    ])
-
-    # Front leg (thick, strong, straighter) - 13%
-    n_leg2 = int(0.13 * n_samples)
-    leg2_upper = int(n_leg2 * 0.45)
-    leg2_lower = int(n_leg2 * 0.35)
-    leg2_foot = n_leg2 - leg2_upper - leg2_lower
-
-    leg2_x = np.concatenate([
-        np.linspace(0.25, 0.28, leg2_upper),
-        np.linspace(0.28, 0.26, leg2_lower),
-        np.linspace(0.26, 0.36, leg2_foot)
-    ])
-    leg2_y = np.concatenate([
-        np.linspace(0.0, -0.4, leg2_upper),
-        np.linspace(-0.4, -0.65, leg2_lower),
-        np.full(leg2_foot, -0.65)
-    ])
-
-    # Tiny arms (very small, characteristic of T-Rex) - 8% each
-    n_arm1 = int(0.08 * n_samples)
-    arm1_x = np.linspace(0.28, 0.32, n_arm1)
-    arm1_y = np.linspace(0.3, 0.15, n_arm1)
-
-    n_arm2 = int(0.08 * n_samples)
-    arm2_x = np.linspace(0.32, 0.36, n_arm2)
-    arm2_y = np.linspace(0.28, 0.13, n_arm2)
-
-    # Combine all parts
-    all_x = np.concatenate([head_x, eye_x, neck_x, body_x, tail_x,
-                            leg1_x, leg2_x, arm1_x, arm2_x])
-    all_y = np.concatenate([head_y, eye_y, neck_y, body_y, tail_y,
-                            leg1_y, leg2_y, arm1_y, arm2_y])
-
-    # Stack into points
-    data = np.stack([all_x, all_y], axis=1)
+    
+    # Center and normalize to [-1, 1] range
+    dino_points = dino_points - dino_points.mean(axis=0)
+    dino_points = dino_points / np.abs(dino_points).max()
+    
+    # Sample with replacement to get n_samples points
+    indices = np.random.choice(len(dino_points), n_samples, replace=True)
+    data = dino_points[indices]
 
     # Add noise
     data += noise * np.random.randn(*data.shape)
-
-    # Normalize to roughly [-1, 1]
-    data = data / (np.abs(data).max() + 1e-8)
 
     return data.astype(np.float32)
 

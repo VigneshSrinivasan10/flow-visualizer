@@ -80,11 +80,12 @@ def main(cfg: DictConfig) -> None:
     model = FlowMatchingModel(velocity_net=velocity_net, device=device)
 
     # Create optimizer
-    optimizer = torch.optim.Adam(
+    optimizer = torch.optim.AdamW(
         velocity_net.parameters(),
         lr=cfg.training.learning_rate,
+        weight_decay=cfg.training.weight_decay,
+        betas=(cfg.training.beta1, cfg.training.beta2),
     )
-
     # Training loop
     logger.info("Starting training...")
     for epoch in range(cfg.training.n_epochs):
