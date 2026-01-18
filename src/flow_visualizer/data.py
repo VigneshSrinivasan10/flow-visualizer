@@ -3,6 +3,7 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+from sklearn.datasets import make_moons, make_circles
 
 
 def generate_trex_data(n_samples: int, noise: float = 0.02) -> np.ndarray:
@@ -112,6 +113,86 @@ class TRexDataset(Dataset):
         """
         self.data = torch.from_numpy(
             generate_trex_data(n_samples, noise)
+        )
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+
+def generate_moons_data(n_samples: int, noise: float = 0.05) -> np.ndarray:
+    """
+    Generate 2D two moons dataset.
+
+    Args:
+        n_samples: Total number of samples to generate
+        noise: Amount of Gaussian noise to add
+
+    Returns:
+        Array of shape (n_samples, 2) containing 2D points
+    """
+    data, _ = make_moons(n_samples=n_samples, noise=noise, random_state=42)
+    # Normalize to roughly [-1, 1]
+    data = data / (np.abs(data).max() + 1e-8)
+    return data.astype(np.float32)
+
+
+def generate_circles_data(n_samples: int, noise: float = 0.05, factor: float = 0.5) -> np.ndarray:
+    """
+    Generate 2D concentric circles dataset.
+
+    Args:
+        n_samples: Total number of samples to generate
+        noise: Amount of Gaussian noise to add
+        factor: Scale factor between inner and outer circle (0 < factor < 1)
+
+    Returns:
+        Array of shape (n_samples, 2) containing 2D points
+    """
+    data, _ = make_circles(n_samples=n_samples, noise=noise, factor=factor, random_state=42)
+    # Normalize to roughly [-1, 1]
+    data = data / (np.abs(data).max() + 1e-8)
+    return data.astype(np.float32)
+
+
+class MoonsDataset(Dataset):
+    """PyTorch dataset for two moons shaped data."""
+
+    def __init__(self, n_samples: int = 10000, noise: float = 0.05):
+        """
+        Initialize Moons dataset.
+
+        Args:
+            n_samples: Number of samples to generate
+            noise: Amount of Gaussian noise to add
+        """
+        self.data = torch.from_numpy(
+            generate_moons_data(n_samples, noise)
+        )
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+
+class CirclesDataset(Dataset):
+    """PyTorch dataset for concentric circles shaped data."""
+
+    def __init__(self, n_samples: int = 10000, noise: float = 0.05, factor: float = 0.5):
+        """
+        Initialize Circles dataset.
+
+        Args:
+            n_samples: Number of samples to generate
+            noise: Amount of Gaussian noise to add
+            factor: Scale factor between inner and outer circle
+        """
+        self.data = torch.from_numpy(
+            generate_circles_data(n_samples, noise, factor)
         )
 
     def __len__(self):

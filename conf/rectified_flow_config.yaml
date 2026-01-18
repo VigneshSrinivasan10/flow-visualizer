@@ -1,0 +1,45 @@
+# Configuration for Rectified Flow Example
+
+# Data settings
+data:
+  dataset_type: moons  # Options: moons, circles
+  n_samples: 10000
+  noise: 0.05
+  # For circles dataset:
+  factor: 0.5  # Scale factor between inner and outer circle
+
+# Model settings
+model:
+  data_dim: 2
+  time_embed_dim: 64
+  hidden_dims: [128, 256, 256, 128]
+
+# Training settings
+training:
+  # Initial flow matching training
+  n_epochs: 200
+  batch_size: 256
+  learning_rate: 0.003
+
+  # Rectified flow settings
+  n_reflow_iterations: 2  # Number of reflow cycles
+  reflow_n_samples: 20000  # Number of paired samples to generate for reflow
+  reflow_n_epochs: 150  # Epochs for each reflow iteration
+
+  device: cpu
+  seed: 42
+  output_dir: outputs/rectified_flow
+  log_interval: 50
+
+# Visualization settings
+visualization:
+  n_sampling_steps: 100
+  output_dir: outputs/rectified_flow_vis
+  grid_size: 20
+  # Animation settings
+  animation_fps: 20
+  animation_dpi: 100
+  animation_subsample: 1
+  n_particles: 100
+  trail_length: 10
+  density_grid_size: 100
