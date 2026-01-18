@@ -11,7 +11,7 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-from flow_visualizer.data import generate_trex_data
+from flow_visualizer.data import generate_spiral_data
 from flow_visualizer.model import FlowMatchingModel, MLPVelocityNet
 
 logger = logging.getLogger(__name__)
@@ -245,7 +245,7 @@ def create_flow_animation(
         )
 
         # Add title with time
-        ax.set_title(f"Flow Matching: t = {t:.3f}\nGaussian → T-Rex", fontsize=16, fontweight="bold")
+        ax.set_title(f"Flow Matching: t = {t:.3f}\nGaussian → Spiral", fontsize=16, fontweight="bold")
         ax.set_xlim(-1.5, 1.5)
         ax.set_ylim(-1.5, 1.5)
         ax.set_aspect("equal")
@@ -442,7 +442,7 @@ def create_density_animation(
         )
 
         ax.set_title(
-            f"Density Evolution: t = {t:.3f}\nGaussian → T-Rex Distribution",
+            f"Density Evolution: t = {t:.3f}\nGaussian → Spiral Distribution",
             fontsize=14,
             fontweight="bold",
         )
@@ -585,7 +585,7 @@ def main(cfg: DictConfig) -> None:
 
     # Generate target data
     logger.info("Generating target data...")
-    target_data = generate_trex_data(
+    target_data = generate_spiral_data(
         n_samples=cfg.data.n_samples,
         noise=cfg.data.noise,
     )

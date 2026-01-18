@@ -10,7 +10,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from flow_visualizer.data import TRexDataset
+from flow_visualizer.data import SpiralDataset
 from flow_visualizer.model import FlowMatchingModel, MLPVelocityNet
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ def main(cfg: DictConfig) -> None:
 
     # Create dataset
     logger.info("Creating dataset...")
-    dataset = TRexDataset(
+    dataset = SpiralDataset(
         n_samples=cfg.data.n_samples,
         noise=cfg.data.noise,
     )
