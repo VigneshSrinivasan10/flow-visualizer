@@ -558,7 +558,7 @@ def create_vector_field_animation(
     plt.close()
 
 
-@hydra.main(version_base=None, config_path="/home/user/flow-visualizer/conf", config_name="config")
+@hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     """Main visualization function."""
     logger.info("Starting visualization...")

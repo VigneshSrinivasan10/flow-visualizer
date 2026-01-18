@@ -39,7 +39,7 @@ def train_epoch(
     return total_loss / len(dataloader)
 
 
-@hydra.main(version_base=None, config_path="/home/user/flow-visualizer/conf", config_name="config")
+@hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     """Main training function."""
     logger.info("Configuration:\n%s", OmegaConf.to_yaml(cfg))
