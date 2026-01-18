@@ -4,6 +4,30 @@ A simplified implementation of diffusion model training and visualization using 
 
 This project is inspired by [Diffusion-Explorer](https://github.com/helblazer811/Diffusion-Explorer) and provides an educational tool for understanding how diffusion models transform Gaussian noise into structured data distributions.
 
+## Gallery
+
+Watch how Flow Matching transforms Gaussian noise into a T-Rex! 🦖
+
+### Flow Animation
+The entire distribution evolving from random noise to the T-Rex shape:
+
+![Flow Animation](outputs/visualizations/flow_animation.gif)
+
+### Particle Trajectories
+Individual particles flowing through the learned velocity field:
+
+![Particle Trajectories](outputs/visualizations/particle_trajectories.gif)
+
+### Density Evolution
+Probability density heatmap showing how the distribution transforms:
+
+![Density Animation](outputs/visualizations/density_animation.gif)
+
+### Vector Field Animation
+The distribution flowing along the learned velocity field:
+
+![Vector Field Animation](outputs/visualizations/vector_field_animation.gif)
+
 ## Features
 
 - **Flow Matching**: Implements continuous normalizing flows for generative modeling

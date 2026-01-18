@@ -33,8 +33,12 @@ env/
 *.swo
 *~
 
-# Outputs
-outputs/
+# Outputs - ignore everything in outputs except visualizations
+outputs/*
+!outputs/visualizations/
+outputs/visualizations/*
+!outputs/visualizations/*.gif
+!outputs/visualizations/*.png
 *.pt
 *.pth
 *.ckpt
