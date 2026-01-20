@@ -23,6 +23,8 @@ dev = [
 flow-visualizer = "main:main"
 fv-train = "flow_visualizer.train:main"
 fv-visualize = "flow_visualizer.visualize:main"
+rf-train = "rectified_flow.train:main"
+rf-visualize = "rectified_flow.visualize:main"
 
 [tool.uv]
 package = true

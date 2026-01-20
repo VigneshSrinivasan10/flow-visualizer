@@ -1,0 +1,34 @@
+# Rectified Flow Configuration
+
+data:
+  n_samples: 10000
+  noise: 0.02
+
+model:
+  width: 512
+  n_blocks: 5
+
+training:
+  n_epochs: 5000
+  batch_size: 256
+  learning_rate: 0.003
+  weight_decay: 0.01
+  gradient_clip: 1.0
+  sigma_min: 0.0001
+  device: cpu
+  seed: 42
+  log_interval: 100
+  output_dir: outputs/models
+  base_model_path: outputs/models/velocity_net.pt
+  coupling_steps: 100
+
+visualization:
+  n_sampling_steps: 100
+  output_dir: outputs/visualizations
+  grid_size: 20
+  animation_fps: 20
+  animation_dpi: 100
+  animation_subsample: 1
+  n_particles: 50
+  trail_length: 10
+  density_grid_size: 80
