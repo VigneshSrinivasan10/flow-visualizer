@@ -11,8 +11,8 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-from flow_visualizer.data import generate_spiral_data
-from flow_visualizer.model import FlowMatchingModel, MLPVelocityNet
+from flow_visualizer.data import CustomDataset
+from flow_visualizer.model import FlowMatchingModel, FlowMLP
 
 logger = logging.getLogger(__name__)
 
@@ -174,8 +174,8 @@ def plot_vector_field(
         # Compute velocity field
         with torch.no_grad():
             pos_tensor = torch.from_numpy(positions).float().to(device)
-            t_tensor = torch.ones(len(positions), 1, device=device) * t
-            velocities = model.velocity_net(pos_tensor, t_tensor).cpu().numpy()
+            t_tensor = torch.ones(len(positions), device=device) * t
+            velocities = model.velocity_net(pos_tensor, time=t_tensor).cpu().numpy()
 
         U = velocities[:, 0].reshape(grid_size, grid_size)
         V = velocities[:, 1].reshape(grid_size, grid_size)
@@ -507,8 +507,8 @@ def create_vector_field_animation(
         # Compute velocity field at current time
         with torch.no_grad():
             pos_tensor = torch.from_numpy(positions).float().to(device)
-            t_tensor = torch.ones(len(positions), 1, device=device) * t
-            velocities = model.velocity_net(pos_tensor, t_tensor).cpu().numpy()
+            t_tensor = torch.ones(len(positions), device=device) * t
+            velocities = model.velocity_net(pos_tensor, time=t_tensor).cpu().numpy()
 
         U = velocities[:, 0].reshape(grid_size, grid_size)
         V = velocities[:, 1].reshape(grid_size, grid_size)
@@ -571,24 +571,22 @@ def main(cfg: DictConfig) -> None:
 
     # Load model
     logger.info("Loading model...")
-    velocity_net = MLPVelocityNet(
-        data_dim=cfg.model.data_dim,
-        time_embed_dim=cfg.model.time_embed_dim,
-        hidden_dims=cfg.model.hidden_dims,
+    velocity_net = FlowMLP(
+        n_features=cfg.model.n_features,
+        width=cfg.model.width,
+        n_blocks=cfg.model.n_blocks,
     )
 
     model_path = Path(cfg.training.output_dir) / "velocity_net.pt"
-    velocity_net.load_state_dict(torch.load(model_path, map_location=device))
+    velocity_net.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model = FlowMatchingModel(velocity_net=velocity_net, device=device)
 
     logger.info("Model loaded successfully")
 
     # Generate target data
     logger.info("Generating target data...")
-    target_data = generate_spiral_data(
-        n_samples=cfg.data.n_samples,
-        noise=cfg.data.noise,
-    )
+    target_dataset = CustomDataset(size=cfg.data.n_samples)
+    target_data = target_dataset.data.numpy()
 
     # Generate samples
     logger.info("Generating samples...")
@@ -596,7 +594,7 @@ def main(cfg: DictConfig) -> None:
     generated_samples = model.sample(
         n_samples=n_vis_samples,
         n_steps=cfg.visualization.n_sampling_steps,
-        data_dim=cfg.model.data_dim,
+        data_dim=cfg.model.n_features,
     )
 
     # Generate trajectory
@@ -604,7 +602,7 @@ def main(cfg: DictConfig) -> None:
     trajectory = model.sample_trajectory(
         n_samples=n_vis_samples,
         n_steps=cfg.visualization.n_sampling_steps,
-        data_dim=cfg.model.data_dim,
+        data_dim=cfg.model.n_features,
     )
 
     # Create visualizations

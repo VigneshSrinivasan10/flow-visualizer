@@ -5,34 +5,36 @@ data:
   n_samples: 10000
   noise: 0.15
 
-# Model settings
+# Model settings (from scaling-recipes)
 model:
-  data_dim: 2
-  time_embed_dim: 64
-  hidden_dims: [512, 512, 512, 512]
+  n_features: 2
+  width: 512
+  n_blocks: 5
 
 # Training settings
 training:
-  n_epochs: 1000
-  batch_size: 256
-  learning_rate: 1e-3
+  n_epochs: 500
+  batch_size: 10000
+  learning_rate: 0.1
   weight_decay: 0.0
   beta1: 0.9
   beta2: 0.999
-  device: cpu 
+  sigma_min: 1e-4
+  gradient_clip: 1.0
+  lr_scheduler: warmup_cooldown
+  device: cpu
   seed: 42
   output_dir: outputs/models
-  log_interval: 50
+  log_interval: 10
 
 # Visualization settings
 visualization:
   n_sampling_steps: 100
   output_dir: outputs/visualizations
   grid_size: 20
-  # Animation settings
-  animation_fps: 20  # Frames per second for GIF animations
-  animation_dpi: 100  # DPI for GIF output (higher = larger file size)
-  animation_subsample: 1  # Use every Nth frame (1 = all frames, 2 = every other frame)
-  n_particles: 100  # Number of particle trajectories to visualize
-  trail_length: 10  # Length of particle trails in frames
-  density_grid_size: 100  # Resolution for density heatmap
+  animation_fps: 20
+  animation_dpi: 100
+  animation_subsample: 1
+  n_particles: 100
+  trail_length: 10
+  density_grid_size: 100
