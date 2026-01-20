@@ -636,14 +636,15 @@ def create_trajectory_curvature_animation(
         particle_paths.append(np.array(path))
     particle_paths = np.array(particle_paths)  # Shape: (n_particles, n_frames, 2)
 
-    # Static source (Gaussian) and target positions
-    source_data = trajectory[0].numpy()[particle_indices]
-    source_data_shifted = source_data.copy()
-    source_data_shifted[:, 0] -= x_offset
+    # Static source (Gaussian) - use ALL samples for denser visualization
+    all_source_data = trajectory[0].numpy()
+    all_source_shifted = all_source_data.copy()
+    all_source_shifted[:, 0] -= x_offset
 
-    target_subset = target_data[:n_samples][particle_indices]
-    target_data_shifted = target_subset.copy()
-    target_data_shifted[:, 0] += x_offset
+    # Static target - use ALL samples for denser visualization
+    all_target_data = target_data[:n_samples]
+    all_target_shifted = all_target_data.copy()
+    all_target_shifted[:, 0] += x_offset
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -654,28 +655,24 @@ def create_trajectory_curvature_animation(
         ax.clear()
         t = frame / (n_frames - 1)
 
-        # Plot static Gaussian source on left (blue)
+        # Plot static Gaussian source on left (blue) - ALL points
         ax.scatter(
-            source_data_shifted[:, 0],
-            source_data_shifted[:, 1],
-            alpha=0.6,
-            s=40,
+            all_source_shifted[:, 0],
+            all_source_shifted[:, 1],
+            alpha=0.4,
+            s=15,
             color="dodgerblue",
-            edgecolors="darkblue",
-            linewidth=0.5,
-            label="Source (Gaussian)",
+            edgecolors="none",
         )
 
-        # Plot static target on right (red)
+        # Plot static target on right (red) - ALL points
         ax.scatter(
-            target_data_shifted[:, 0],
-            target_data_shifted[:, 1],
-            alpha=0.6,
-            s=40,
+            all_target_shifted[:, 0],
+            all_target_shifted[:, 1],
+            alpha=0.4,
+            s=15,
             color="crimson",
-            edgecolors="darkred",
-            linewidth=0.5,
-            label="Target",
+            edgecolors="none",
         )
 
         # Draw full trajectory lines (faded) showing curvature
@@ -712,14 +709,17 @@ def create_trajectory_curvature_animation(
 
         ax.set_title("Trajectory Curvature", fontsize=14, fontweight="bold")
         ax.set_xlim(-4.5, 4.5)
-        ax.set_ylim(-2, 2)
+        ax.set_ylim(-2.2, 2)
         ax.set_aspect("equal")
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
-        ax.legend(loc="upper right", fontsize=9)
+
+        # Remove ticks and box
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
 
         # Add time slider at bottom
-        slider_y = -1.7
+        slider_y = -1.9
         ax.plot([-3.5, 3.5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
         slider_x = -3.5 + 7.0 * t
         ax.scatter([slider_x], [slider_y], s=100, color="black", zorder=20)
@@ -771,6 +771,7 @@ def create_probability_path_animation(
     x_offset = 2.5
 
     fig, ax = plt.subplots(figsize=(12, 6))
+    fig.patch.set_facecolor('white')
 
     # Create grid for density estimation (wider for left-right layout)
     x = np.linspace(-4.5, 4.5, grid_size * 2)
@@ -801,6 +802,7 @@ def create_probability_path_animation(
 
     def update(frame):
         ax.clear()
+        ax.set_facecolor('white')
         t = (frame * subsample) / (len(trajectory) - 1)
 
         # Transform current data to left-right layout
