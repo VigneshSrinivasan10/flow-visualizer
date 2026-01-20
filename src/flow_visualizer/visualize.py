@@ -277,7 +277,7 @@ def create_flow_animation(
         )
 
         # Add title with time
-        ax.set_title(f"Flow Matching: t = {t:.3f}\nGaussian → Spiral", fontsize=16, fontweight="bold")
+        ax.set_title(f"Flow Matching: t = {t:.3f}", fontsize=16, fontweight="bold")
         ax.set_xlim(-1.5, 1.5)
         ax.set_ylim(-1.5, 1.5)
         ax.set_aspect("equal")
@@ -474,7 +474,7 @@ def create_density_animation(
         )
 
         ax.set_title(
-            f"Density Evolution: t = {t:.3f}\nGaussian → Spiral Distribution",
+            f"Density Evolution: t = {t:.3f}",
             fontsize=14,
             fontweight="bold",
         )
