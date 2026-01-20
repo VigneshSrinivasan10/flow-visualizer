@@ -1,13 +1,15 @@
-"""Flow Matching model for 2D data generation."""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from collections import defaultdict
 
+class FlowModel(nn.Module):
+
+    def forward(self, X, time):
+        raise NotImplementedError()
 
 class ZeroToOneTimeEmbedding(nn.Module):
-    """Time embedding for t in [0, 1]."""
 
     def __init__(self, dim: int):
         super().__init__()
@@ -20,129 +22,88 @@ class ZeroToOneTimeEmbedding(nn.Module):
         emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
         return emb
 
-
-class FlowMLP(nn.Module):
-    """Simple MLP network for flow matching."""
-
-    def __init__(
-        self,
-        n_features: int = 2,
-        width: int = 128,
-        n_blocks: int = 5,
-    ):
+class FlowMLP(FlowModel):
+    def __init__(self, n_features=2, width=10, n_blocks=5, nonlin=F.relu, output_mult=1.0, input_mult=1.0):
         super().__init__()
 
-        self.n_features = n_features
-        self.time_embed_dim = width
+        self.nonlin = nonlin
+        self.input_mult = input_mult
+        self.output_mult = output_mult
 
-        # Time embedding
-        self.time_embedding = ZeroToOneTimeEmbedding(self.time_embed_dim)
+        self.n_blocks = n_blocks
+        self.time_embedding_size = width - n_features
 
-        # Build MLP layers
-        layers = []
-        input_dim = n_features + self.time_embed_dim
-
-        for _ in range(n_blocks):
-            layers.extend([
-                nn.Linear(input_dim, width),
+        self.time_embedding = ZeroToOneTimeEmbedding(self.time_embedding_size)
+        blocks = []
+        for _ in range(self.n_blocks):
+            blocks.append(nn.Sequential(
+                nn.Linear(width, width, bias=False),
                 nn.SiLU(),
-            ])
-            input_dim = width
+            ))
+        self.blocks = nn.ModuleList(blocks)
+        self.final = nn.Linear(width, n_features, bias=False)
+        self.reset_parameters()
 
-        layers.append(nn.Linear(width, n_features))
-        self.net = nn.Sequential(*layers)
+    def reset_parameters(self, base_std=0.02) -> None:
+        # init all weights with fan_in / 1024 * base_std
+        for n, p in self.named_parameters():
+            skip_list = ["final"]
+            if not any([s in n for s in skip_list]):
+                fan_in = p.shape[1]
+                p.data.normal_(mean=0.0, std=base_std * (fan_in) ** -0.5)
+        # init final layer with zeros
+        nn.init.zeros_(self.final.weight)
 
-    def forward(self, x: torch.Tensor, time: torch.Tensor = None) -> torch.Tensor:
-        """
-        Predict velocity at given position and time.
-
-        Args:
-            x: Data points of shape (batch_size, n_features)
-            time: Time values of shape (batch_size,) or (batch_size, 1)
-
-        Returns:
-            Predicted velocity of shape (batch_size, n_features)
-        """
+    def forward(self, X, time=None):
         if time is None:
-            time = torch.rand(x.shape[0], device=x.device)
-        if time.dim() == 2:
-            time = time.squeeze(-1)
+            time = torch.rand(X.shape[0], device=X.device)
+        X = torch.cat([X, self.time_embedding(time)], axis=1)
+        for block in self.blocks:
+            X = X + block(X)
+        X = self.final(X)
+        return X
 
-        t_embed = self.time_embedding(time)
-        h = torch.cat([x, t_embed], dim=-1)
-        return self.net(h)
+    def configure_optimizers(self, weight_decay, learning_rate, betas):
+        no_decay_name_list = ["bias", "norm"]
 
+        optimizer_grouped_parameters = []
+        final_optimizer_settings = {}
 
-class FlowMatchingModel:
-    """Flow Matching model for training and sampling."""
+        param_groups = defaultdict(
+            lambda: {"params": [], "weight_decay": None, "lr": None}
+        )
 
-    def __init__(
-        self,
-        velocity_net: nn.Module,
-        device: str = "cpu",
-    ):
-        self.velocity_net = velocity_net.to(device)
-        self.device = device
+        for n, p in self.named_parameters():
+            if p.requires_grad:
 
-    @torch.no_grad()
-    def sample(
-        self,
-        n_samples: int,
-        n_steps: int = 100,
-        data_dim: int = 2,
-    ) -> torch.Tensor:
-        """
-        Generate samples using Euler integration.
+                # Define learning rate for specific types of params
+                if any(ndnl in n for ndnl in no_decay_name_list):
+                    lr_value = learning_rate * 0.1
+                    per_layer_weight_decay_value = 0.0
+                else:
+                    hidden_dim = p.shape[-1]
+                    lr_value = learning_rate * (32 / hidden_dim)
+                    per_layer_weight_decay_value = (
+                        weight_decay * hidden_dim / 1024
+                    )  # weight decay 0.1 (SP: 1024)
 
-        Args:
-            n_samples: Number of samples to generate
-            n_steps: Number of integration steps
-            data_dim: Dimension of the data
+                # in the case of embedding layer, we use higher lr.
+                if "time_embedding" in n:
+                    lr_value = learning_rate * 0.3
+                    per_layer_weight_decay_value = 0.0
 
-        Returns:
-            Generated samples of shape (n_samples, data_dim)
-        """
-        self.velocity_net.eval()
+                group_key = (lr_value, per_layer_weight_decay_value)
+                param_groups[group_key]["params"].append(p)
+                param_groups[group_key]["weight_decay"] = per_layer_weight_decay_value
+                param_groups[group_key]["lr"] = lr_value
 
-        x = torch.randn(n_samples, data_dim, device=self.device)
-        dt = 1.0 / n_steps
+                final_optimizer_settings[n] = {
+                    "lr": lr_value,
+                    "wd": per_layer_weight_decay_value,
+                    "shape": str(list(p.shape)),
+                }
 
-        for step in range(n_steps):
-            t = torch.ones(n_samples, device=self.device) * (step / n_steps)
-            v = self.velocity_net(x, time=t)
-            x = x + v * dt
+        optimizer_grouped_parameters = [v for v in param_groups.values()]
+        optimizer = torch.optim.AdamW(optimizer_grouped_parameters, betas=betas)
 
-        return x
-
-    @torch.no_grad()
-    def sample_trajectory(
-        self,
-        n_samples: int,
-        n_steps: int = 100,
-        data_dim: int = 2,
-    ) -> list[torch.Tensor]:
-        """
-        Generate samples and return full trajectory.
-
-        Args:
-            n_samples: Number of samples to generate
-            n_steps: Number of integration steps
-            data_dim: Dimension of the data
-
-        Returns:
-            List of tensors, each of shape (n_samples, data_dim)
-        """
-        self.velocity_net.eval()
-
-        x = torch.randn(n_samples, data_dim, device=self.device)
-        trajectory = [x.cpu().clone()]
-
-        dt = 1.0 / n_steps
-
-        for step in range(n_steps):
-            t = torch.ones(n_samples, device=self.device) * (step / n_steps)
-            v = self.velocity_net(x, time=t)
-            x = x + v * dt
-            trajectory.append(x.cpu().clone())
-
-        return trajectory
+        return optimizer, final_optimizer_settings

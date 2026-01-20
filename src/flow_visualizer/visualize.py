@@ -12,7 +12,39 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
 from flow_visualizer.data import CustomDataset
-from flow_visualizer.model import FlowMatchingModel, FlowMLP
+from flow_visualizer.model import FlowMLP
+
+
+class FlowMatchingModel:
+    """Simple wrapper for sampling from FlowMLP."""
+
+    def __init__(self, velocity_net, device="cpu"):
+        self.velocity_net = velocity_net.to(device)
+        self.device = device
+
+    @torch.no_grad()
+    def sample(self, n_samples, n_steps=100, data_dim=2):
+        self.velocity_net.eval()
+        x = torch.randn(n_samples, data_dim, device=self.device)
+        dt = 1.0 / n_steps
+        for step in range(n_steps):
+            t = torch.ones(n_samples, device=self.device) * (step / n_steps)
+            v = self.velocity_net(x, time=t)
+            x = x + v * dt
+        return x.cpu()
+
+    @torch.no_grad()
+    def sample_trajectory(self, n_samples, n_steps=100, data_dim=2):
+        self.velocity_net.eval()
+        x = torch.randn(n_samples, data_dim, device=self.device)
+        trajectory = [x.cpu().clone()]
+        dt = 1.0 / n_steps
+        for step in range(n_steps):
+            t = torch.ones(n_samples, device=self.device) * (step / n_steps)
+            v = self.velocity_net(x, time=t)
+            x = x + v * dt
+            trajectory.append(x.cpu().clone())
+        return trajectory
 
 logger = logging.getLogger(__name__)
 
@@ -572,7 +604,6 @@ def main(cfg: DictConfig) -> None:
     # Load model
     logger.info("Loading model...")
     velocity_net = FlowMLP(
-        n_features=cfg.model.n_features,
         width=cfg.model.width,
         n_blocks=cfg.model.n_blocks,
     )
@@ -594,7 +625,6 @@ def main(cfg: DictConfig) -> None:
     generated_samples = model.sample(
         n_samples=n_vis_samples,
         n_steps=cfg.visualization.n_sampling_steps,
-        data_dim=cfg.model.n_features,
     )
 
     # Generate trajectory
@@ -602,7 +632,6 @@ def main(cfg: DictConfig) -> None:
     trajectory = model.sample_trajectory(
         n_samples=n_vis_samples,
         n_steps=cfg.visualization.n_sampling_steps,
-        data_dim=cfg.model.n_features,
     )
 
     # Create visualizations
