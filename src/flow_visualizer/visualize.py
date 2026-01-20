@@ -590,6 +590,199 @@ def create_vector_field_animation(
     plt.close()
 
 
+def create_trajectory_curvature_animation(
+    trajectory: list[torch.Tensor],
+    target_data: np.ndarray,
+    save_path: Path,
+    n_particles: int = 50,
+    fps: int = 20,
+    dpi: int = 100,
+):
+    """
+    Create an animated GIF showing trajectory curvature - full curved paths from noise to target.
+
+    This visualization emphasizes how flow trajectories curve rather than travel in straight lines,
+    similar to Figure 2 in https://alechelbling.com/blog/rectified-flow/
+
+    Args:
+        trajectory: List of tensors representing the sampling trajectory
+        target_data: Target data distribution
+        save_path: Path to save the GIF
+        n_particles: Number of particle trajectories to visualize
+        fps: Frames per second for the animation
+        dpi: DPI for the output GIF
+    """
+    n_frames = len(trajectory)
+    n_samples = trajectory[0].shape[0]
+
+    # Select random particles to track
+    particle_indices = np.random.choice(n_samples, size=n_particles, replace=False)
+
+    # Extract full particle paths
+    particle_paths = []
+    for idx in particle_indices:
+        path = np.array([traj[idx].numpy() for traj in trajectory])
+        particle_paths.append(path)
+    particle_paths = np.array(particle_paths)  # Shape: (n_particles, n_frames, 2)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Color particles using a colormap
+    colors = plt.cm.plasma(np.linspace(0.1, 0.9, n_particles))
+
+    def update(frame):
+        ax.clear()
+        t = frame / (n_frames - 1)
+
+        # Plot target distribution (very faded background)
+        ax.scatter(
+            target_data[:, 0],
+            target_data[:, 1],
+            alpha=0.08,
+            s=3,
+            color="gray",
+        )
+
+        # Draw trajectory lines up to current frame (showing the curvature)
+        for i, path in enumerate(particle_paths):
+            # Draw the path traced so far
+            if frame > 0:
+                ax.plot(
+                    path[: frame + 1, 0],
+                    path[: frame + 1, 1],
+                    alpha=0.7,
+                    linewidth=1.2,
+                    color=colors[i],
+                )
+
+            # Draw starting point (small circle)
+            ax.scatter(
+                path[0, 0],
+                path[0, 1],
+                s=20,
+                color=colors[i],
+                alpha=0.5,
+                marker="o",
+            )
+
+            # Draw current position (larger circle)
+            ax.scatter(
+                path[frame, 0],
+                path[frame, 1],
+                s=60,
+                color=colors[i],
+                edgecolors="black",
+                linewidth=0.8,
+                zorder=10,
+            )
+
+        ax.set_title(
+            f"Trajectory Curvature: t = {t:.2f}",
+            fontsize=14,
+            fontweight="bold",
+        )
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect("equal")
+        ax.grid(True, alpha=0.3)
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+
+    logger.info(f"Creating trajectory curvature animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    writer = PillowWriter(fps=fps)
+    anim.save(save_path, writer=writer, dpi=dpi)
+    logger.info(f"Trajectory curvature animation saved to {save_path}")
+    plt.close()
+
+
+def create_probability_path_animation(
+    trajectory: list[torch.Tensor],
+    target_data: np.ndarray,
+    save_path: Path,
+    fps: int = 20,
+    dpi: int = 100,
+    subsample: int = 1,
+    grid_size: int = 80,
+):
+    """
+    Create an animated GIF showing the probability path - smooth interpolation between distributions.
+
+    This visualization shows how the probability distribution smoothly morphs from a Gaussian
+    (source) to the target distribution, similar to Figure 3 in
+    https://alechelbling.com/blog/rectified-flow/
+
+    Args:
+        trajectory: List of tensors representing the sampling trajectory
+        target_data: Target data distribution
+        save_path: Path to save the GIF
+        fps: Frames per second for the animation
+        dpi: DPI for the output GIF
+        subsample: Use every Nth frame to reduce file size
+        grid_size: Resolution of the density grid
+    """
+    from scipy.stats import gaussian_kde
+
+    trajectory_subset = trajectory[::subsample]
+    n_frames = len(trajectory_subset)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Create grid for density estimation
+    x = np.linspace(-1.5, 1.5, grid_size)
+    y = np.linspace(-1.5, 1.5, grid_size)
+    X, Y = np.meshgrid(x, y)
+    positions = np.vstack([X.ravel(), Y.ravel()])
+
+    def update(frame):
+        ax.clear()
+        data = trajectory_subset[frame].numpy()
+        t = (frame * subsample) / (len(trajectory) - 1)
+
+        # Compute density using KDE
+        try:
+            kde = gaussian_kde(data.T, bw_method=0.15)
+            Z = kde(positions).reshape(grid_size, grid_size)
+
+            # Plot filled contours showing probability density
+            levels = np.linspace(0, Z.max() * 0.95, 15)
+            ax.contourf(X, Y, Z, levels=levels, cmap="viridis", alpha=0.9)
+
+            # Add contour lines for clarity
+            ax.contour(X, Y, Z, levels=levels[::2], colors="white", alpha=0.3, linewidths=0.5)
+
+        except np.linalg.LinAlgError:
+            # Fallback if KDE fails
+            ax.scatter(
+                data[:, 0],
+                data[:, 1],
+                alpha=0.5,
+                s=10,
+                color="blue",
+            )
+
+        ax.set_title(
+            f"Probability Path: t = {t:.2f}",
+            fontsize=14,
+            fontweight="bold",
+        )
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(-1.5, 1.5)
+        ax.set_aspect("equal")
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_facecolor("#1a1a2e")
+
+    logger.info(f"Creating probability path animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    writer = PillowWriter(fps=fps)
+    anim.save(save_path, writer=writer, dpi=dpi)
+    logger.info(f"Probability path animation saved to {save_path}")
+    plt.close()
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     """Main visualization function."""
@@ -703,6 +896,27 @@ def main(cfg: DictConfig) -> None:
         dpi=cfg.visualization.get("animation_dpi", 100),
         subsample=cfg.visualization.get("animation_subsample", 1),
         grid_size=cfg.visualization.get("grid_size", 20),
+    )
+
+    logger.info("Creating trajectory curvature animation...")
+    create_trajectory_curvature_animation(
+        trajectory,
+        target_data[:n_vis_samples],
+        output_dir / "trajectory_curvature.gif",
+        n_particles=cfg.visualization.get("n_particles", 50),
+        fps=cfg.visualization.get("animation_fps", 20),
+        dpi=cfg.visualization.get("animation_dpi", 100),
+    )
+
+    logger.info("Creating probability path animation...")
+    create_probability_path_animation(
+        trajectory,
+        target_data[:n_vis_samples],
+        output_dir / "probability_path.gif",
+        fps=cfg.visualization.get("animation_fps", 20),
+        dpi=cfg.visualization.get("animation_dpi", 100),
+        subsample=cfg.visualization.get("animation_subsample", 1),
+        grid_size=cfg.visualization.get("density_grid_size", 80),
     )
 
     logger.info("Visualization complete! Generated static plots and animated GIFs.")
