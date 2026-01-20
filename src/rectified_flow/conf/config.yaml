@@ -18,13 +18,13 @@ training:
   device: cpu
   seed: 42
   log_interval: 100
-  output_dir: outputs/rectified_flow
+  output_dir: outputs/models
   base_model_path: outputs/models/velocity_net.pt
   coupling_steps: 100
 
 visualization:
   n_sampling_steps: 100
-  output_dir: outputs/rectified_flow/visualizations
+  output_dir: outputs/visualizations
   grid_size: 20
   animation_fps: 20
   animation_dpi: 100

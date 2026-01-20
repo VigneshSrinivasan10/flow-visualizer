@@ -276,7 +276,7 @@ def main(cfg: DictConfig) -> None:
         n_blocks=cfg.model.n_blocks,
     )
 
-    model_path = Path(cfg.training.output_dir) / "velocity_net.pt"
+    model_path = Path(cfg.training.output_dir) / "rectified_flow_velocity_net.pt"
     velocity_net.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model = FlowMatchingModel(velocity_net=velocity_net, device=device)
 

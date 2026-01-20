@@ -169,7 +169,7 @@ def main(cfg: DictConfig) -> None:
     output_dir = Path(cfg.training.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    model_path = output_dir / "velocity_net.pt"
+    model_path = output_dir / "rectified_flow_velocity_net.pt"
     torch.save(model.state_dict(), model_path)
     logger.info(f"Rectified flow model saved to {model_path}")
 
