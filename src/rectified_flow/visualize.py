@@ -300,7 +300,7 @@ def main(cfg: DictConfig) -> None:
     create_trajectory_curvature_animation(
         trajectory,
         target_data[:n_vis_samples],
-        output_dir / "trajectory_curvature.gif",
+        output_dir / "rectified_flow_trajectory_curvature.gif",
         n_particles=cfg.visualization.get("n_particles", 50),
         fps=cfg.visualization.get("animation_fps", 20),
         dpi=cfg.visualization.get("animation_dpi", 100),
@@ -310,7 +310,7 @@ def main(cfg: DictConfig) -> None:
     create_probability_path_animation(
         trajectory,
         target_data[:n_vis_samples],
-        output_dir / "probability_path.gif",
+        output_dir / "rectified_flow_probability_path.gif",
         fps=cfg.visualization.get("animation_fps", 20),
         dpi=cfg.visualization.get("animation_dpi", 100),
         subsample=cfg.visualization.get("animation_subsample", 1),
