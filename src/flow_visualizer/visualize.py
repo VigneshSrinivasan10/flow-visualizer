@@ -599,10 +599,11 @@ def create_trajectory_curvature_animation(
     dpi: int = 100,
 ):
     """
-    Create an animated GIF showing trajectory curvature - full curved paths from noise to target.
+    Create an animated GIF showing trajectory curvature with left-right flow layout.
 
-    This visualization emphasizes how flow trajectories curve rather than travel in straight lines,
-    similar to Figure 2 in https://alechelbling.com/blog/rectified-flow/
+    Layout: Gaussian (source) on left, target on right, with curved particle paths
+    flowing between them. Time slider at bottom shows progress.
+    Similar to Figure 2 in https://alechelbling.com/blog/rectified-flow/
 
     Args:
         trajectory: List of tensors representing the sampling trajectory
@@ -615,78 +616,116 @@ def create_trajectory_curvature_animation(
     n_frames = len(trajectory)
     n_samples = trajectory[0].shape[0]
 
+    # Offsets for left-right layout
+    x_offset = 2.5  # Horizontal separation
+
     # Select random particles to track
     particle_indices = np.random.choice(n_samples, size=n_particles, replace=False)
 
-    # Extract full particle paths
+    # Extract full particle paths and transform to left-right layout
+    # Path goes from (x - x_offset, y) at t=0 to (x + x_offset, y) at t=1
     particle_paths = []
     for idx in particle_indices:
-        path = np.array([traj[idx].numpy() for traj in trajectory])
-        particle_paths.append(path)
+        path = []
+        for frame_idx, traj in enumerate(trajectory):
+            t = frame_idx / (n_frames - 1)
+            pt = traj[idx].numpy()
+            # Interpolate x position from left (-x_offset) to right (+x_offset)
+            x_pos = pt[0] + x_offset * (2 * t - 1)
+            path.append([x_pos, pt[1]])
+        particle_paths.append(np.array(path))
     particle_paths = np.array(particle_paths)  # Shape: (n_particles, n_frames, 2)
 
-    fig, ax = plt.subplots(figsize=(8, 8))
+    # Static source (Gaussian) and target positions
+    source_data = trajectory[0].numpy()[particle_indices]
+    source_data_shifted = source_data.copy()
+    source_data_shifted[:, 0] -= x_offset
+
+    target_subset = target_data[:n_samples][particle_indices]
+    target_data_shifted = target_subset.copy()
+    target_data_shifted[:, 0] += x_offset
+
+    fig, ax = plt.subplots(figsize=(12, 6))
 
     # Color particles using a colormap
-    colors = plt.cm.plasma(np.linspace(0.1, 0.9, n_particles))
+    colors = plt.cm.coolwarm(np.linspace(0.1, 0.9, n_particles))
 
     def update(frame):
         ax.clear()
         t = frame / (n_frames - 1)
 
-        # Plot target distribution (very faded background)
+        # Plot static Gaussian source on left (blue)
         ax.scatter(
-            target_data[:, 0],
-            target_data[:, 1],
-            alpha=0.08,
-            s=3,
-            color="gray",
+            source_data_shifted[:, 0],
+            source_data_shifted[:, 1],
+            alpha=0.6,
+            s=40,
+            color="dodgerblue",
+            edgecolors="darkblue",
+            linewidth=0.5,
+            label="Source (Gaussian)",
         )
 
-        # Draw trajectory lines up to current frame (showing the curvature)
+        # Plot static target on right (red)
+        ax.scatter(
+            target_data_shifted[:, 0],
+            target_data_shifted[:, 1],
+            alpha=0.6,
+            s=40,
+            color="crimson",
+            edgecolors="darkred",
+            linewidth=0.5,
+            label="Target",
+        )
+
+        # Draw full trajectory lines (faded) showing curvature
         for i, path in enumerate(particle_paths):
-            # Draw the path traced so far
+            ax.plot(
+                path[:, 0],
+                path[:, 1],
+                alpha=0.15,
+                linewidth=1,
+                color="gray",
+            )
+
+        # Draw trajectory lines up to current frame
+        for i, path in enumerate(particle_paths):
             if frame > 0:
                 ax.plot(
                     path[: frame + 1, 0],
                     path[: frame + 1, 1],
-                    alpha=0.7,
-                    linewidth=1.2,
+                    alpha=0.6,
+                    linewidth=1.5,
                     color=colors[i],
                 )
 
-            # Draw starting point (small circle)
-            ax.scatter(
-                path[0, 0],
-                path[0, 1],
-                s=20,
-                color=colors[i],
-                alpha=0.5,
-                marker="o",
-            )
-
-            # Draw current position (larger circle)
+            # Draw current position
             ax.scatter(
                 path[frame, 0],
                 path[frame, 1],
-                s=60,
+                s=30,
                 color=colors[i],
                 edgecolors="black",
-                linewidth=0.8,
+                linewidth=0.5,
                 zorder=10,
             )
 
-        ax.set_title(
-            f"Trajectory Curvature: t = {t:.2f}",
-            fontsize=14,
-            fontweight="bold",
-        )
-        ax.set_xlim(-1.5, 1.5)
-        ax.set_ylim(-1.5, 1.5)
+        ax.set_title("Trajectory Curvature", fontsize=14, fontweight="bold")
+        ax.set_xlim(-4.5, 4.5)
+        ax.set_ylim(-2, 2)
         ax.set_aspect("equal")
-        ax.grid(True, alpha=0.3)
         ax.set_xlabel("x")
         ax.set_ylabel("y")
+        ax.legend(loc="upper right", fontsize=9)
+
+        # Add time slider at bottom
+        slider_y = -1.7
+        ax.plot([-3.5, 3.5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
+        slider_x = -3.5 + 7.0 * t
+        ax.scatter([slider_x], [slider_y], s=100, color="black", zorder=20)
+        ax.text(-3.5, slider_y - 0.25, "t=0", ha="center", fontsize=10)
+        ax.text(3.5, slider_y - 0.25, "t=1", ha="center", fontsize=10)
+        ax.text(slider_x, slider_y + 0.2, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
 
     logger.info(f"Creating trajectory curvature animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
@@ -707,11 +746,11 @@ def create_probability_path_animation(
     grid_size: int = 80,
 ):
     """
-    Create an animated GIF showing the probability path - smooth interpolation between distributions.
+    Create an animated GIF showing the probability path with left-right flow layout.
 
-    This visualization shows how the probability distribution smoothly morphs from a Gaussian
-    (source) to the target distribution, similar to Figure 3 in
-    https://alechelbling.com/blog/rectified-flow/
+    Layout: Gaussian density on left, target density on right, with probability mass
+    flowing between them. Time slider at bottom shows progress.
+    Similar to Figure 3 in https://alechelbling.com/blog/rectified-flow/
 
     Args:
         trajectory: List of tensors representing the sampling trajectory
@@ -726,53 +765,98 @@ def create_probability_path_animation(
 
     trajectory_subset = trajectory[::subsample]
     n_frames = len(trajectory_subset)
+    n_samples = trajectory_subset[0].shape[0]
 
-    fig, ax = plt.subplots(figsize=(8, 8))
+    # Offsets for left-right layout
+    x_offset = 2.5
 
-    # Create grid for density estimation
-    x = np.linspace(-1.5, 1.5, grid_size)
-    y = np.linspace(-1.5, 1.5, grid_size)
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Create grid for density estimation (wider for left-right layout)
+    x = np.linspace(-4.5, 4.5, grid_size * 2)
+    y = np.linspace(-2, 2, grid_size)
     X, Y = np.meshgrid(x, y)
     positions = np.vstack([X.ravel(), Y.ravel()])
 
+    # Precompute static source and target densities
+    source_data = trajectory_subset[0].numpy()
+    source_shifted = source_data.copy()
+    source_shifted[:, 0] -= x_offset
+
+    target_subset = target_data[:n_samples]
+    target_shifted = target_subset.copy()
+    target_shifted[:, 0] += x_offset
+
+    try:
+        source_kde = gaussian_kde(source_shifted.T, bw_method=0.15)
+        Z_source = source_kde(positions).reshape(grid_size, grid_size * 2)
+    except np.linalg.LinAlgError:
+        Z_source = None
+
+    try:
+        target_kde = gaussian_kde(target_shifted.T, bw_method=0.15)
+        Z_target = target_kde(positions).reshape(grid_size, grid_size * 2)
+    except np.linalg.LinAlgError:
+        Z_target = None
+
     def update(frame):
         ax.clear()
-        data = trajectory_subset[frame].numpy()
         t = (frame * subsample) / (len(trajectory) - 1)
 
-        # Compute density using KDE
+        # Transform current data to left-right layout
+        data = trajectory_subset[frame].numpy()
+        data_shifted = data.copy()
+        data_shifted[:, 0] += x_offset * (2 * t - 1)
+
+        # Plot static source density on left (faded blue)
+        if Z_source is not None:
+            levels_source = np.linspace(0, Z_source.max() * 0.95, 10)
+            ax.contourf(X, Y, Z_source, levels=levels_source, cmap="Blues", alpha=0.3)
+            ax.contour(X, Y, Z_source, levels=levels_source[::2], colors="blue", alpha=0.2, linewidths=0.5)
+
+        # Plot static target density on right (faded red)
+        if Z_target is not None:
+            levels_target = np.linspace(0, Z_target.max() * 0.95, 10)
+            ax.contourf(X, Y, Z_target, levels=levels_target, cmap="Reds", alpha=0.3)
+            ax.contour(X, Y, Z_target, levels=levels_target[::2], colors="red", alpha=0.2, linewidths=0.5)
+
+        # Compute and plot current density (moving from left to right)
         try:
-            kde = gaussian_kde(data.T, bw_method=0.15)
-            Z = kde(positions).reshape(grid_size, grid_size)
+            kde = gaussian_kde(data_shifted.T, bw_method=0.15)
+            Z = kde(positions).reshape(grid_size, grid_size * 2)
 
-            # Plot filled contours showing probability density
             levels = np.linspace(0, Z.max() * 0.95, 15)
-            ax.contourf(X, Y, Z, levels=levels, cmap="viridis", alpha=0.9)
-
-            # Add contour lines for clarity
-            ax.contour(X, Y, Z, levels=levels[::2], colors="white", alpha=0.3, linewidths=0.5)
+            ax.contourf(X, Y, Z, levels=levels, cmap="viridis", alpha=0.85)
+            ax.contour(X, Y, Z, levels=levels[::2], colors="white", alpha=0.4, linewidths=0.5)
 
         except np.linalg.LinAlgError:
-            # Fallback if KDE fails
             ax.scatter(
-                data[:, 0],
-                data[:, 1],
+                data_shifted[:, 0],
+                data_shifted[:, 1],
                 alpha=0.5,
                 s=10,
-                color="blue",
+                color="green",
             )
 
-        ax.set_title(
-            f"Probability Path: t = {t:.2f}",
-            fontsize=14,
-            fontweight="bold",
-        )
-        ax.set_xlim(-1.5, 1.5)
-        ax.set_ylim(-1.5, 1.5)
+        ax.set_title("Probability Path", fontsize=14, fontweight="bold")
+        ax.set_xlim(-4.5, 4.5)
+        ax.set_ylim(-2, 2)
         ax.set_aspect("equal")
         ax.set_xlabel("x")
         ax.set_ylabel("y")
-        ax.set_facecolor("#1a1a2e")
+
+        # Add labels for source and target
+        ax.text(-x_offset, 1.7, "Source", ha="center", fontsize=11, color="blue", fontweight="bold")
+        ax.text(x_offset, 1.7, "Target", ha="center", fontsize=11, color="red", fontweight="bold")
+
+        # Add time slider at bottom
+        slider_y = -1.7
+        ax.plot([-3.5, 3.5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
+        slider_x = -3.5 + 7.0 * t
+        ax.scatter([slider_x], [slider_y], s=100, color="black", zorder=20)
+        ax.text(-3.5, slider_y - 0.25, "t=0", ha="center", fontsize=10)
+        ax.text(3.5, slider_y - 0.25, "t=1", ha="center", fontsize=10)
+        ax.text(slider_x, slider_y + 0.2, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
 
     logger.info(f"Creating probability path animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
