@@ -779,26 +779,15 @@ def create_probability_path_animation(
     X, Y = np.meshgrid(x, y)
     positions = np.vstack([X.ravel(), Y.ravel()])
 
-    # Precompute static source and target densities
-    source_data = trajectory_subset[0].numpy()
-    source_shifted = source_data.copy()
-    source_shifted[:, 0] -= x_offset
+    # Static source (Gaussian) - use ALL samples for denser visualization
+    all_source_data = trajectory_subset[0].numpy()
+    all_source_shifted = all_source_data.copy()
+    all_source_shifted[:, 0] -= x_offset
 
-    target_subset = target_data[:n_samples]
-    target_shifted = target_subset.copy()
-    target_shifted[:, 0] += x_offset
-
-    try:
-        source_kde = gaussian_kde(source_shifted.T, bw_method=0.15)
-        Z_source = source_kde(positions).reshape(grid_size, grid_size * 2)
-    except np.linalg.LinAlgError:
-        Z_source = None
-
-    try:
-        target_kde = gaussian_kde(target_shifted.T, bw_method=0.15)
-        Z_target = target_kde(positions).reshape(grid_size, grid_size * 2)
-    except np.linalg.LinAlgError:
-        Z_target = None
+    # Static target - use ALL samples for denser visualization
+    all_target_data = target_data[:n_samples]
+    all_target_shifted = all_target_data.copy()
+    all_target_shifted[:, 0] += x_offset
 
     def update(frame):
         ax.clear()
@@ -810,17 +799,25 @@ def create_probability_path_animation(
         data_shifted = data.copy()
         data_shifted[:, 0] += x_offset * (2 * t - 1)
 
-        # Plot static source density on left (faded blue)
-        if Z_source is not None:
-            levels_source = np.linspace(0, Z_source.max() * 0.95, 10)
-            ax.contourf(X, Y, Z_source, levels=levels_source, cmap="Blues", alpha=0.3)
-            ax.contour(X, Y, Z_source, levels=levels_source[::2], colors="blue", alpha=0.2, linewidths=0.5)
+        # Plot static Gaussian source on left (blue points)
+        ax.scatter(
+            all_source_shifted[:, 0],
+            all_source_shifted[:, 1],
+            alpha=0.4,
+            s=15,
+            color="dodgerblue",
+            edgecolors="none",
+        )
 
-        # Plot static target density on right (faded red)
-        if Z_target is not None:
-            levels_target = np.linspace(0, Z_target.max() * 0.95, 10)
-            ax.contourf(X, Y, Z_target, levels=levels_target, cmap="Reds", alpha=0.3)
-            ax.contour(X, Y, Z_target, levels=levels_target[::2], colors="red", alpha=0.2, linewidths=0.5)
+        # Plot static target on right (red points)
+        ax.scatter(
+            all_target_shifted[:, 0],
+            all_target_shifted[:, 1],
+            alpha=0.4,
+            s=15,
+            color="crimson",
+            edgecolors="none",
+        )
 
         # Compute and plot current density (moving from left to right)
         try:
