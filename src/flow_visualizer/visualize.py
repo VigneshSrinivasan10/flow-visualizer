@@ -641,10 +641,10 @@ def create_trajectory_curvature_animation(
     all_source_shifted = all_source_data.copy()
     all_source_shifted[:, 0] -= x_offset
 
-    # Static target - use ALL samples for denser visualization
-    all_target_data = target_data[:n_samples]
-    all_target_shifted = all_target_data.copy()
-    all_target_shifted[:, 0] += x_offset
+    # Use actual generated endpoints (trajectory[-1]), not target_data
+    all_generated_data = trajectory[-1].numpy()
+    all_generated_shifted = all_generated_data.copy()
+    all_generated_shifted[:, 0] += x_offset
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -665,10 +665,10 @@ def create_trajectory_curvature_animation(
             edgecolors="none",
         )
 
-        # Plot static target on right (red) - ALL points
+        # Plot static generated on right (red) - ALL points
         ax.scatter(
-            all_target_shifted[:, 0],
-            all_target_shifted[:, 1],
+            all_generated_shifted[:, 0],
+            all_generated_shifted[:, 1],
             alpha=0.4,
             s=15,
             color="crimson",
@@ -784,10 +784,10 @@ def create_probability_path_animation(
     all_source_shifted = all_source_data.copy()
     all_source_shifted[:, 0] -= x_offset
 
-    # Static target - use ALL samples for denser visualization
-    all_target_data = target_data[:n_samples]
-    all_target_shifted = all_target_data.copy()
-    all_target_shifted[:, 0] += x_offset
+    # Use actual generated endpoints (trajectory[-1]), not target_data
+    all_generated_data = trajectory_subset[-1].numpy()
+    all_generated_shifted = all_generated_data.copy()
+    all_generated_shifted[:, 0] += x_offset
 
     def update(frame):
         ax.clear()
@@ -809,10 +809,10 @@ def create_probability_path_animation(
             edgecolors="none",
         )
 
-        # Plot static target on right (red points)
+        # Plot static generated on right (red points)
         ax.scatter(
-            all_target_shifted[:, 0],
-            all_target_shifted[:, 1],
+            all_generated_shifted[:, 0],
+            all_generated_shifted[:, 1],
             alpha=0.4,
             s=15,
             color="crimson",
