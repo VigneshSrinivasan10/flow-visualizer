@@ -709,7 +709,7 @@ def create_trajectory_curvature_animation(
 
         ax.set_title("Trajectory Curvature", fontsize=14, fontweight="bold")
         ax.set_xlim(-4.5, 4.5)
-        ax.set_ylim(-2.2, 2)
+        ax.set_ylim(-2.8, 2)
         ax.set_aspect("equal")
 
         # Remove ticks and box
@@ -718,14 +718,14 @@ def create_trajectory_curvature_animation(
         for spine in ax.spines.values():
             spine.set_visible(False)
 
-        # Add time slider at bottom
-        slider_y = -1.9
+        # Add time slider at bottom (further down)
+        slider_y = -2.4
         ax.plot([-3.5, 3.5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
         slider_x = -3.5 + 7.0 * t
         ax.scatter([slider_x], [slider_y], s=100, color="black", zorder=20)
-        ax.text(-3.5, slider_y - 0.25, "t=0", ha="center", fontsize=10)
-        ax.text(3.5, slider_y - 0.25, "t=1", ha="center", fontsize=10)
-        ax.text(slider_x, slider_y + 0.2, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
+        ax.text(-3.5, slider_y - 0.35, "t=0", ha="center", fontsize=10)
+        ax.text(3.5, slider_y - 0.35, "t=1", ha="center", fontsize=10)
+        ax.text(slider_x, slider_y + 0.25, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
 
     logger.info(f"Creating trajectory curvature animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
@@ -775,7 +775,7 @@ def create_probability_path_animation(
 
     # Create grid for density estimation (wider for left-right layout)
     x = np.linspace(-4.5, 4.5, grid_size * 2)
-    y = np.linspace(-2, 2, grid_size)
+    y = np.linspace(-2.5, 2, grid_size)
     X, Y = np.meshgrid(x, y)
     positions = np.vstack([X.ravel(), Y.ravel()])
 
@@ -828,8 +828,8 @@ def create_probability_path_animation(
             Z = kde(positions).reshape(grid_size, grid_size * 2)
 
             levels = np.linspace(0, Z.max() * 0.95, 15)
-            ax.contourf(X, Y, Z, levels=levels, cmap="viridis", alpha=0.85)
-            ax.contour(X, Y, Z, levels=levels[::2], colors="white", alpha=0.4, linewidths=0.5)
+            ax.contourf(X, Y, Z, levels=levels, cmap="Blues", alpha=0.9)
+            ax.contour(X, Y, Z, levels=levels[::2], colors="darkblue", alpha=0.3, linewidths=0.5)
 
         except np.linalg.LinAlgError:
             ax.scatter(
@@ -837,28 +837,32 @@ def create_probability_path_animation(
                 data_shifted[:, 1],
                 alpha=0.5,
                 s=10,
-                color="green",
+                color="blue",
             )
 
         ax.set_title("Probability Path", fontsize=14, fontweight="bold")
         ax.set_xlim(-4.5, 4.5)
-        ax.set_ylim(-2, 2)
+        ax.set_ylim(-2.8, 2.2)
         ax.set_aspect("equal")
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
+
+        # Remove ticks and box
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
 
         # Add labels for source and target
-        ax.text(-x_offset, 1.7, "Source", ha="center", fontsize=11, color="blue", fontweight="bold")
-        ax.text(x_offset, 1.7, "Target", ha="center", fontsize=11, color="red", fontweight="bold")
+        ax.text(-x_offset, 1.7, "Source", ha="center", fontsize=11, color="gray", fontweight="bold")
+        ax.text(x_offset, 1.7, "Target", ha="center", fontsize=11, color="gray", fontweight="bold")
 
-        # Add time slider at bottom
-        slider_y = -1.7
+        # Add time slider at bottom (further down)
+        slider_y = -2.3
         ax.plot([-3.5, 3.5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
         slider_x = -3.5 + 7.0 * t
         ax.scatter([slider_x], [slider_y], s=100, color="black", zorder=20)
-        ax.text(-3.5, slider_y - 0.25, "t=0", ha="center", fontsize=10)
-        ax.text(3.5, slider_y - 0.25, "t=1", ha="center", fontsize=10)
-        ax.text(slider_x, slider_y + 0.2, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
+        ax.text(-3.5, slider_y - 0.35, "t=0", ha="center", fontsize=10)
+        ax.text(3.5, slider_y - 0.35, "t=1", ha="center", fontsize=10)
+        ax.text(slider_x, slider_y + 0.25, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
 
     logger.info(f"Creating probability path animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
