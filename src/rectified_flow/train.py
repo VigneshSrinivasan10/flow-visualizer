@@ -103,9 +103,10 @@ def main(cfg: DictConfig) -> None:
     base_model.eval()
     logger.info(f"Base model loaded from {base_model_path}")
 
-    # Create rectified flow model
-    logger.info("Creating rectified flow model...")
+    # Create rectified flow model - initialize from base model
+    logger.info("Creating rectified flow model (initialized from base model)...")
     model = FlowMLP(width=cfg.model.width, n_blocks=cfg.model.n_blocks)
+    model.load_state_dict(base_model.state_dict())  # Initialize from base model
     model.to(device)
 
     # Configure optimizer
