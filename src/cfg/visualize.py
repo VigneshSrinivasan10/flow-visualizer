@@ -242,16 +242,19 @@ def create_cfg_vector_field_animation(
     all_generated_shifted = all_generated_data.copy()
     all_generated_shifted[:, 0] += x_offset
 
-    # Select one representative point per class (fixed throughout animation)
+    # Select 3 representative points per class (9 total), ordered by class
+    # Order: class0_pt0, class0_pt1, class0_pt2, class1_pt0, class1_pt1, class1_pt2, ...
+    n_points_per_class = 3
     representative_indices = []
     for c in range(3):
         class_indices = np.where(labels_np == c)[0]
-        if c == 0:  # Blue (left eye) - pick a different point (1/4 through)
-            representative_indices.append(class_indices[len(class_indices) // 4])
-        else:  # Green and red - keep middle point
-            representative_indices.append(class_indices[len(class_indices) // 2])
+        # Pick 3 evenly spaced points from each class
+        for j in range(n_points_per_class):
+            idx = class_indices[(j + 1) * len(class_indices) // (n_points_per_class + 1)]
+            representative_indices.append(idx)
     representative_indices = np.array(representative_indices)
     rep_classes = labels_np[representative_indices]
+    n_rep_points = len(representative_indices)  # 9
 
     # Build full paths for representative points
     rep_paths = []
@@ -263,10 +266,10 @@ def create_cfg_vector_field_animation(
             x_pos = pt[0] + x_offset * (2 * t - 1)
             path.append([x_pos, pt[1]])
         rep_paths.append(np.array(path))
-    rep_paths = np.array(rep_paths)  # Shape: (3, traj_frames, 2)
+    rep_paths = np.array(rep_paths)  # Shape: (9, traj_frames, 2)
 
-    # Total frames: 3 points animated sequentially
-    n_frames = traj_frames * 3
+    # Total frames: 9 points animated sequentially
+    n_frames = traj_frames * n_rep_points
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -278,7 +281,7 @@ def create_cfg_vector_field_animation(
         ax.clear()
 
         # Determine which point is currently animating and its local frame
-        active_point = frame // traj_frames  # 0, 1, or 2
+        active_point = frame // traj_frames  # 0 to 8
         local_frame = frame % traj_frames
         t = local_frame / (traj_frames - 1)
 
@@ -287,7 +290,7 @@ def create_cfg_vector_field_animation(
         # - Active point: at local_frame
         # - Points after active_point: at their start position (frame = 0)
         point_frames = []
-        for i in range(3):
+        for i in range(n_rep_points):
             if i < active_point:
                 point_frames.append(traj_frames - 1)  # finished
             elif i == active_point:
@@ -295,7 +298,7 @@ def create_cfg_vector_field_animation(
             else:
                 point_frames.append(0)  # not started
 
-        current_positions = np.array([rep_paths[i, point_frames[i], :] for i in range(3)])
+        current_positions = np.array([rep_paths[i, point_frames[i], :] for i in range(n_rep_points)])
 
         # Get original (non-shifted) positions for velocity computation (only for active point)
         data = trajectory[local_frame].numpy()
@@ -385,7 +388,7 @@ def create_cfg_vector_field_animation(
             )
 
         # Plot velocity arrows only for the active point
-        scale = 15
+        scale = 30
         arrow_width = 0.010
         active_pos = current_positions[active_point:active_point+1]
         # Unconditional (gray)
@@ -423,7 +426,7 @@ def create_cfg_vector_field_animation(
         ax.text(3.5, slider_y - 0.35, "t=1", ha="center", fontsize=10)
         ax.text(slider_x, slider_y + 0.25, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
 
-    logger.info(f"Creating CFG vector field animation with {n_frames} frames (3 points sequentially)...")
+    logger.info(f"Creating CFG vector field animation with {n_frames} frames ({n_rep_points} points sequentially)...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
     writer = PillowWriter(fps=fps)
