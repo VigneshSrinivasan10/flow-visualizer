@@ -220,7 +220,7 @@ def create_cfg_vector_field_animation(
     """
     Create vector field animation with left-right layout showing uncond/cond/CFG arrows.
 
-    Layout: Gaussian on left, generated on right, with 3 arrow types in the middle.
+    Layout: Gaussian on left, generated on right, with 3 arrow types for one point per class.
     - Gray arrows: Unconditional velocity
     - Orange arrows: Conditional velocity
     - Purple arrows: Final CFG velocity
@@ -241,12 +241,18 @@ def create_cfg_vector_field_animation(
     all_generated_shifted = all_generated_data.copy()
     all_generated_shifted[:, 0] += x_offset
 
+    # Select one representative point per class (fixed throughout animation)
+    representative_indices = []
+    for c in range(3):
+        class_indices = np.where(labels_np == c)[0]
+        representative_indices.append(class_indices[0])
+    representative_indices = np.array(representative_indices)
+
     fig, ax = plt.subplots(figsize=(12, 6))
 
     model.velocity_net.eval()
     device = model.device
 
-    # Use class 0 for grid visualization
     null_class_idx = model.velocity_net.null_class_idx
 
     def update(frame):
@@ -258,17 +264,15 @@ def create_cfg_vector_field_animation(
         data_shifted = data.copy()
         data_shifted[:, 0] += x_offset * (2 * t - 1)
 
-        # Create grid for vector field at current data positions (subsampled)
-        grid_indices = np.random.choice(len(data_shifted), size=min(grid_size * grid_size, len(data_shifted)), replace=False)
-        grid_positions = data_shifted[grid_indices]
-        grid_classes = labels_np[grid_indices]
+        # Get positions and classes for representative points
+        rep_positions = data_shifted[representative_indices]
+        rep_classes = labels_np[representative_indices]
 
-        # Compute velocities
+        # Compute velocities for representative points
         with torch.no_grad():
-            # Use original (non-shifted) positions for velocity computation
-            pos_tensor = torch.from_numpy(data[grid_indices]).float().to(device)
-            t_tensor = torch.ones(len(grid_indices), device=device) * t
-            class_tensor = torch.from_numpy(grid_classes).long().to(device)
+            pos_tensor = torch.from_numpy(data[representative_indices]).float().to(device)
+            t_tensor = torch.ones(3, device=device) * t
+            class_tensor = torch.from_numpy(rep_classes).long().to(device)
 
             # Conditional velocity
             v_cond = model.velocity_net(pos_tensor, time=t_tensor, class_labels=class_tensor).cpu().numpy()
@@ -317,20 +321,34 @@ def create_cfg_vector_field_animation(
                 linewidth=0.3,
             )
 
-        # Plot vector fields at grid positions
-        scale = 8
+        # Highlight representative points
+        ax.scatter(
+            rep_positions[:, 0],
+            rep_positions[:, 1],
+            s=100,
+            color=[CLASS_COLORS[c] for c in rep_classes],
+            edgecolors='black',
+            linewidth=2,
+            zorder=15,
+        )
+
+        # Plot vector fields at representative positions (one per class)
+        scale = 6
         # Unconditional (gray)
-        ax.quiver(grid_positions[:, 0], grid_positions[:, 1],
+        ax.quiver(rep_positions[:, 0], rep_positions[:, 1],
                   v_uncond[:, 0], v_uncond[:, 1],
-                  alpha=0.5, scale=scale, color='gray', width=0.005)
+                  alpha=0.7, scale=scale, color='gray', width=0.008,
+                  zorder=20)
         # Conditional (orange)
-        ax.quiver(grid_positions[:, 0], grid_positions[:, 1],
+        ax.quiver(rep_positions[:, 0], rep_positions[:, 1],
                   v_cond[:, 0], v_cond[:, 1],
-                  alpha=0.6, scale=scale, color='orange', width=0.005)
+                  alpha=0.8, scale=scale, color='orange', width=0.008,
+                  zorder=21)
         # CFG (purple) - thicker
-        ax.quiver(grid_positions[:, 0], grid_positions[:, 1],
+        ax.quiver(rep_positions[:, 0], rep_positions[:, 1],
                   v_cfg[:, 0], v_cfg[:, 1],
-                  alpha=0.8, scale=scale, color='purple', width=0.007)
+                  alpha=0.9, scale=scale, color='purple', width=0.010,
+                  zorder=22)
 
         ax.set_title("CFG Vector Field\nGray=Uncond | Orange=Cond | Purple=CFG", fontsize=12, fontweight="bold")
         ax.set_xlim(-4.5, 4.5)
