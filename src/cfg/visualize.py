@@ -366,8 +366,8 @@ def create_cfg_vector_field_animation(
             )
 
         # Plot velocity arrows at current positions (using display velocities with shift)
-        scale = 8
-        arrow_width = 0.012
+        scale = 15
+        arrow_width = 0.010
         # Unconditional (gray)
         ax.quiver(current_positions[:, 0], current_positions[:, 1],
                   v_uncond_display[:, 0], v_uncond_display[:, 1],
