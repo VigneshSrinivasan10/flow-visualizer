@@ -221,12 +221,13 @@ def create_cfg_vector_field_animation(
     Create vector field animation with left-right layout showing uncond/cond/CFG arrows.
 
     Shows gaussian on left, generated on right, with 3 representative points showing arrows.
+    Points animate one by one (sequentially), not all at once.
     - Gray arrows: Unconditional velocity
     - Orange arrows: Conditional velocity
     - Purple arrows: Final CFG velocity
     Time slider at bottom.
     """
-    n_frames = len(trajectory)
+    traj_frames = len(trajectory)
     labels_np = class_labels.numpy()
 
     x_offset = 2.5
@@ -257,12 +258,15 @@ def create_cfg_vector_field_animation(
     for idx in representative_indices:
         path = []
         for frame_idx, traj in enumerate(trajectory):
-            t = frame_idx / (n_frames - 1)
+            t = frame_idx / (traj_frames - 1)
             pt = traj[idx].numpy()
             x_pos = pt[0] + x_offset * (2 * t - 1)
             path.append([x_pos, pt[1]])
         rep_paths.append(np.array(path))
-    rep_paths = np.array(rep_paths)  # Shape: (3, n_frames, 2)
+    rep_paths = np.array(rep_paths)  # Shape: (3, traj_frames, 2)
+
+    # Total frames: 3 points animated sequentially
+    n_frames = traj_frames * 3
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -272,20 +276,36 @@ def create_cfg_vector_field_animation(
 
     def update(frame):
         ax.clear()
-        t = frame / (n_frames - 1)
 
-        # Current positions for representative points
-        current_positions = rep_paths[:, frame, :]
+        # Determine which point is currently animating and its local frame
+        active_point = frame // traj_frames  # 0, 1, or 2
+        local_frame = frame % traj_frames
+        t = local_frame / (traj_frames - 1)
 
-        # Get original (non-shifted) positions for velocity computation
-        data = trajectory[frame].numpy()
-        original_positions = data[representative_indices]
+        # Determine position of each point:
+        # - Points before active_point: at their end position (frame = traj_frames - 1)
+        # - Active point: at local_frame
+        # - Points after active_point: at their start position (frame = 0)
+        point_frames = []
+        for i in range(3):
+            if i < active_point:
+                point_frames.append(traj_frames - 1)  # finished
+            elif i == active_point:
+                point_frames.append(local_frame)  # animating
+            else:
+                point_frames.append(0)  # not started
 
-        # Compute velocities for representative points
+        current_positions = np.array([rep_paths[i, point_frames[i], :] for i in range(3)])
+
+        # Get original (non-shifted) positions for velocity computation (only for active point)
+        data = trajectory[local_frame].numpy()
+        active_original_pos = data[representative_indices[active_point:active_point+1]]
+
+        # Compute velocities only for the active point
         with torch.no_grad():
-            pos_tensor = torch.from_numpy(original_positions).float().to(device)
-            t_tensor = torch.ones(3, device=device) * t
-            class_tensor = torch.from_numpy(rep_classes).long().to(device)
+            pos_tensor = torch.from_numpy(active_original_pos).float().to(device)
+            t_tensor = torch.ones(1, device=device) * t
+            class_tensor = torch.tensor([rep_classes[active_point]], dtype=torch.long, device=device)
 
             # Conditional velocity
             v_cond = model.velocity_net(pos_tensor, time=t_tensor, class_labels=class_tensor).cpu().numpy()
@@ -298,8 +318,6 @@ def create_cfg_vector_field_animation(
             v_cfg = v_uncond + guidance_scale * (v_cond - v_uncond)
 
         # Add x-offset velocity to account for left-right layout shift
-        # The shift is x_offset * (2*t - 1), so dx/dt = 2 * x_offset per unit time
-        # Scale to match the visual motion
         shift_velocity = 2 * x_offset
         v_uncond_display = v_uncond.copy()
         v_uncond_display[:, 0] += shift_velocity
@@ -342,18 +360,19 @@ def create_cfg_vector_field_animation(
                 color=CLASS_COLORS[c],
             )
 
-        # Draw trajectory up to current frame
+        # Draw trajectory up to current frame for each point
         for i, c in enumerate(rep_classes):
-            if frame > 0:
+            pf = point_frames[i]
+            if pf > 0:
                 ax.plot(
-                    rep_paths[i, :frame+1, 0],
-                    rep_paths[i, :frame+1, 1],
+                    rep_paths[i, :pf+1, 0],
+                    rep_paths[i, :pf+1, 1],
                     alpha=0.6,
                     linewidth=3,
                     color=CLASS_COLORS[c],
                 )
 
-        # Current points (large, highlighted)
+        # Draw all points (large, highlighted)
         for i, c in enumerate(rep_classes):
             ax.scatter(
                 current_positions[i, 0],
@@ -365,21 +384,22 @@ def create_cfg_vector_field_animation(
                 zorder=15,
             )
 
-        # Plot velocity arrows at current positions (using display velocities with shift)
+        # Plot velocity arrows only for the active point
         scale = 15
         arrow_width = 0.010
+        active_pos = current_positions[active_point:active_point+1]
         # Unconditional (gray)
-        ax.quiver(current_positions[:, 0], current_positions[:, 1],
+        ax.quiver(active_pos[:, 0], active_pos[:, 1],
                   v_uncond_display[:, 0], v_uncond_display[:, 1],
                   alpha=0.8, scale=scale, color='gray', width=arrow_width,
                   zorder=20)
         # Conditional (orange)
-        ax.quiver(current_positions[:, 0], current_positions[:, 1],
+        ax.quiver(active_pos[:, 0], active_pos[:, 1],
                   v_cond_display[:, 0], v_cond_display[:, 1],
                   alpha=0.9, scale=scale, color='orange', width=arrow_width,
                   zorder=21)
         # CFG (purple)
-        ax.quiver(current_positions[:, 0], current_positions[:, 1],
+        ax.quiver(active_pos[:, 0], active_pos[:, 1],
                   v_cfg_display[:, 0], v_cfg_display[:, 1],
                   alpha=1.0, scale=scale, color='purple', width=arrow_width * 1.3,
                   zorder=22)
@@ -394,7 +414,7 @@ def create_cfg_vector_field_animation(
         for spine in ax.spines.values():
             spine.set_visible(False)
 
-        # Time slider
+        # Time slider (shows progress for current point only)
         slider_y = -2.4
         ax.plot([-3.5, 3.5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
         slider_x = -3.5 + 7.0 * t
@@ -403,7 +423,7 @@ def create_cfg_vector_field_animation(
         ax.text(3.5, slider_y - 0.35, "t=1", ha="center", fontsize=10)
         ax.text(slider_x, slider_y + 0.25, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
 
-    logger.info(f"Creating CFG vector field animation with {n_frames} frames...")
+    logger.info(f"Creating CFG vector field animation with {n_frames} frames (3 points sequentially)...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
     writer = PillowWriter(fps=fps)
