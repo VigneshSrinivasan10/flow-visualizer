@@ -220,57 +220,61 @@ def create_cfg_vector_field_animation(
     """
     Create vector field animation with left-right layout showing uncond/cond/CFG arrows.
 
-    Layout: Gaussian on left, generated on right, with 3 arrow types for one point per class.
+    Shows only 3 points (one per class) with their velocity arrows.
     - Gray arrows: Unconditional velocity
     - Orange arrows: Conditional velocity
     - Purple arrows: Final CFG velocity
     Time slider at bottom.
     """
     n_frames = len(trajectory)
-    n_samples = trajectory[0].shape[0]
     labels_np = class_labels.numpy()
 
     x_offset = 2.5
-
-    # Static source and generated
-    all_source_data = trajectory[0].numpy()
-    all_source_shifted = all_source_data.copy()
-    all_source_shifted[:, 0] -= x_offset
-
-    all_generated_data = trajectory[-1].numpy()
-    all_generated_shifted = all_generated_data.copy()
-    all_generated_shifted[:, 0] += x_offset
 
     # Select one representative point per class (fixed throughout animation)
     representative_indices = []
     for c in range(3):
         class_indices = np.where(labels_np == c)[0]
-        representative_indices.append(class_indices[0])
+        representative_indices.append(class_indices[len(class_indices) // 2])  # Pick middle point
     representative_indices = np.array(representative_indices)
+    rep_classes = labels_np[representative_indices]
+
+    # Build full paths for representative points
+    rep_paths = []
+    for idx in representative_indices:
+        path = []
+        for frame_idx, traj in enumerate(trajectory):
+            t = frame_idx / (n_frames - 1)
+            pt = traj[idx].numpy()
+            x_pos = pt[0] + x_offset * (2 * t - 1)
+            path.append([x_pos, pt[1]])
+        rep_paths.append(np.array(path))
+    rep_paths = np.array(rep_paths)  # Shape: (3, n_frames, 2)
+
+    # Source and target positions for representative points
+    source_positions = rep_paths[:, 0, :]  # t=0
+    target_positions = rep_paths[:, -1, :]  # t=1
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
     model.velocity_net.eval()
     device = model.device
-
     null_class_idx = model.velocity_net.null_class_idx
 
     def update(frame):
         ax.clear()
         t = frame / (n_frames - 1)
 
-        # Current data position (shifted for left-right layout)
-        data = trajectory[frame].numpy()
-        data_shifted = data.copy()
-        data_shifted[:, 0] += x_offset * (2 * t - 1)
+        # Current positions for representative points
+        current_positions = rep_paths[:, frame, :]
 
-        # Get positions and classes for representative points
-        rep_positions = data_shifted[representative_indices]
-        rep_classes = labels_np[representative_indices]
+        # Get original (non-shifted) positions for velocity computation
+        data = trajectory[frame].numpy()
+        original_positions = data[representative_indices]
 
         # Compute velocities for representative points
         with torch.no_grad():
-            pos_tensor = torch.from_numpy(data[representative_indices]).float().to(device)
+            pos_tensor = torch.from_numpy(original_positions).float().to(device)
             t_tensor = torch.ones(3, device=device) * t
             class_tensor = torch.from_numpy(rep_classes).long().to(device)
 
@@ -284,73 +288,82 @@ def create_cfg_vector_field_animation(
             # CFG velocity
             v_cfg = v_uncond + guidance_scale * (v_cond - v_uncond)
 
-        # Plot static source on left
-        for c in range(3):
-            mask = labels_np == c
+        # Plot source points on left (faded)
+        for i, c in enumerate(rep_classes):
             ax.scatter(
-                all_source_shifted[mask, 0],
-                all_source_shifted[mask, 1],
-                alpha=0.3,
-                s=12,
+                source_positions[i, 0],
+                source_positions[i, 1],
+                s=150,
                 color=CLASS_COLORS[c],
+                alpha=0.3,
                 edgecolors="none",
             )
 
-        # Plot static generated on right
-        for c in range(3):
-            mask = labels_np == c
+        # Plot target points on right (faded)
+        for i, c in enumerate(rep_classes):
             ax.scatter(
-                all_generated_shifted[mask, 0],
-                all_generated_shifted[mask, 1],
-                alpha=0.3,
-                s=12,
+                target_positions[i, 0],
+                target_positions[i, 1],
+                s=150,
                 color=CLASS_COLORS[c],
+                alpha=0.3,
                 edgecolors="none",
             )
 
-        # Plot current distribution (moving)
-        for c in range(3):
-            mask = labels_np == c
-            ax.scatter(
-                data_shifted[mask, 0],
-                data_shifted[mask, 1],
-                alpha=0.5,
-                s=15,
+        # Draw full trajectory paths (faded)
+        for i, c in enumerate(rep_classes):
+            ax.plot(
+                rep_paths[i, :, 0],
+                rep_paths[i, :, 1],
+                alpha=0.2,
+                linewidth=2,
                 color=CLASS_COLORS[c],
-                edgecolors='white',
-                linewidth=0.3,
             )
 
-        # Highlight representative points
-        ax.scatter(
-            rep_positions[:, 0],
-            rep_positions[:, 1],
-            s=100,
-            color=[CLASS_COLORS[c] for c in rep_classes],
-            edgecolors='black',
-            linewidth=2,
-            zorder=15,
-        )
+        # Draw trajectory up to current frame
+        for i, c in enumerate(rep_classes):
+            if frame > 0:
+                ax.plot(
+                    rep_paths[i, :frame+1, 0],
+                    rep_paths[i, :frame+1, 1],
+                    alpha=0.6,
+                    linewidth=3,
+                    color=CLASS_COLORS[c],
+                )
 
-        # Plot vector fields at representative positions (one per class)
-        scale = 6
+        # Current points (large, highlighted)
+        for i, c in enumerate(rep_classes):
+            ax.scatter(
+                current_positions[i, 0],
+                current_positions[i, 1],
+                s=200,
+                color=CLASS_COLORS[c],
+                edgecolors='black',
+                linewidth=2,
+                zorder=15,
+                label=CLASS_NAMES[c],
+            )
+
+        # Plot velocity arrows at current positions
+        scale = 4
+        arrow_width = 0.012
         # Unconditional (gray)
-        ax.quiver(rep_positions[:, 0], rep_positions[:, 1],
+        ax.quiver(current_positions[:, 0], current_positions[:, 1],
                   v_uncond[:, 0], v_uncond[:, 1],
-                  alpha=0.7, scale=scale, color='gray', width=0.008,
-                  zorder=20)
+                  alpha=0.8, scale=scale, color='gray', width=arrow_width,
+                  zorder=20, label='Uncond')
         # Conditional (orange)
-        ax.quiver(rep_positions[:, 0], rep_positions[:, 1],
+        ax.quiver(current_positions[:, 0], current_positions[:, 1],
                   v_cond[:, 0], v_cond[:, 1],
-                  alpha=0.8, scale=scale, color='orange', width=0.008,
-                  zorder=21)
-        # CFG (purple) - thicker
-        ax.quiver(rep_positions[:, 0], rep_positions[:, 1],
+                  alpha=0.9, scale=scale, color='orange', width=arrow_width,
+                  zorder=21, label='Cond')
+        # CFG (purple)
+        ax.quiver(current_positions[:, 0], current_positions[:, 1],
                   v_cfg[:, 0], v_cfg[:, 1],
-                  alpha=0.9, scale=scale, color='purple', width=0.010,
-                  zorder=22)
+                  alpha=1.0, scale=scale, color='purple', width=arrow_width * 1.3,
+                  zorder=22, label=f'CFG (w={guidance_scale})')
 
-        ax.set_title("CFG Vector Field\nGray=Uncond | Orange=Cond | Purple=CFG", fontsize=12, fontweight="bold")
+        ax.set_title("CFG Vector Field: Gray=Uncond | Orange=Cond | Purple=CFG", fontsize=12, fontweight="bold")
         ax.set_xlim(-4.5, 4.5)
         ax.set_ylim(-2.8, 2)
         ax.set_aspect("equal")
