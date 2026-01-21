@@ -297,6 +297,17 @@ def create_cfg_vector_field_animation(
             # CFG velocity
             v_cfg = v_uncond + guidance_scale * (v_cond - v_uncond)
 
+        # Add x-offset velocity to account for left-right layout shift
+        # The shift is x_offset * (2*t - 1), so dx/dt = 2 * x_offset per unit time
+        # Scale to match the visual motion
+        shift_velocity = 2 * x_offset
+        v_uncond_display = v_uncond.copy()
+        v_uncond_display[:, 0] += shift_velocity
+        v_cond_display = v_cond.copy()
+        v_cond_display[:, 0] += shift_velocity
+        v_cfg_display = v_cfg.copy()
+        v_cfg_display[:, 0] += shift_velocity
+
         # Plot static Gaussian source on left - colored by class
         for c in range(3):
             mask = labels_np == c
@@ -354,22 +365,22 @@ def create_cfg_vector_field_animation(
                 zorder=15,
             )
 
-        # Plot velocity arrows at current positions
-        scale = 4
+        # Plot velocity arrows at current positions (using display velocities with shift)
+        scale = 8
         arrow_width = 0.012
         # Unconditional (gray)
         ax.quiver(current_positions[:, 0], current_positions[:, 1],
-                  v_uncond[:, 0], v_uncond[:, 1],
+                  v_uncond_display[:, 0], v_uncond_display[:, 1],
                   alpha=0.8, scale=scale, color='gray', width=arrow_width,
                   zorder=20)
         # Conditional (orange)
         ax.quiver(current_positions[:, 0], current_positions[:, 1],
-                  v_cond[:, 0], v_cond[:, 1],
+                  v_cond_display[:, 0], v_cond_display[:, 1],
                   alpha=0.9, scale=scale, color='orange', width=arrow_width,
                   zorder=21)
         # CFG (purple)
         ax.quiver(current_positions[:, 0], current_positions[:, 1],
-                  v_cfg[:, 0], v_cfg[:, 1],
+                  v_cfg_display[:, 0], v_cfg_display[:, 1],
                   alpha=1.0, scale=scale, color='purple', width=arrow_width * 1.3,
                   zorder=22)
 
