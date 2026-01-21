@@ -220,7 +220,7 @@ def create_cfg_vector_field_animation(
     """
     Create vector field animation with left-right layout showing uncond/cond/CFG arrows.
 
-    Shows only 3 points (one per class) with their velocity arrows.
+    Shows gaussian on left, generated on right, with 3 representative points showing arrows.
     - Gray arrows: Unconditional velocity
     - Orange arrows: Conditional velocity
     - Purple arrows: Final CFG velocity
@@ -231,11 +231,24 @@ def create_cfg_vector_field_animation(
 
     x_offset = 2.5
 
+    # Static source (Gaussian) - ALL samples
+    all_source_data = trajectory[0].numpy()
+    all_source_shifted = all_source_data.copy()
+    all_source_shifted[:, 0] -= x_offset
+
+    # Generated endpoints - ALL samples
+    all_generated_data = trajectory[-1].numpy()
+    all_generated_shifted = all_generated_data.copy()
+    all_generated_shifted[:, 0] += x_offset
+
     # Select one representative point per class (fixed throughout animation)
     representative_indices = []
     for c in range(3):
         class_indices = np.where(labels_np == c)[0]
-        representative_indices.append(class_indices[len(class_indices) // 2])  # Pick middle point
+        if c == 0:  # Blue (left eye) - pick a different point (1/4 through)
+            representative_indices.append(class_indices[len(class_indices) // 4])
+        else:  # Green and red - keep middle point
+            representative_indices.append(class_indices[len(class_indices) // 2])
     representative_indices = np.array(representative_indices)
     rep_classes = labels_np[representative_indices]
 
@@ -250,10 +263,6 @@ def create_cfg_vector_field_animation(
             path.append([x_pos, pt[1]])
         rep_paths.append(np.array(path))
     rep_paths = np.array(rep_paths)  # Shape: (3, n_frames, 2)
-
-    # Source and target positions for representative points
-    source_positions = rep_paths[:, 0, :]  # t=0
-    target_positions = rep_paths[:, -1, :]  # t=1
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -288,25 +297,27 @@ def create_cfg_vector_field_animation(
             # CFG velocity
             v_cfg = v_uncond + guidance_scale * (v_cond - v_uncond)
 
-        # Plot source points on left (faded)
-        for i, c in enumerate(rep_classes):
+        # Plot static Gaussian source on left - colored by class
+        for c in range(3):
+            mask = labels_np == c
             ax.scatter(
-                source_positions[i, 0],
-                source_positions[i, 1],
-                s=150,
+                all_source_shifted[mask, 0],
+                all_source_shifted[mask, 1],
+                alpha=0.4,
+                s=15,
                 color=CLASS_COLORS[c],
-                alpha=0.3,
                 edgecolors="none",
             )
 
-        # Plot target points on right (faded)
-        for i, c in enumerate(rep_classes):
+        # Plot static generated on right - colored by class
+        for c in range(3):
+            mask = labels_np == c
             ax.scatter(
-                target_positions[i, 0],
-                target_positions[i, 1],
-                s=150,
+                all_generated_shifted[mask, 0],
+                all_generated_shifted[mask, 1],
+                alpha=0.4,
+                s=15,
                 color=CLASS_COLORS[c],
-                alpha=0.3,
                 edgecolors="none",
             )
 
@@ -341,7 +352,6 @@ def create_cfg_vector_field_animation(
                 edgecolors='black',
                 linewidth=2,
                 zorder=15,
-                label=CLASS_NAMES[c],
             )
 
         # Plot velocity arrows at current positions
@@ -351,17 +361,17 @@ def create_cfg_vector_field_animation(
         ax.quiver(current_positions[:, 0], current_positions[:, 1],
                   v_uncond[:, 0], v_uncond[:, 1],
                   alpha=0.8, scale=scale, color='gray', width=arrow_width,
-                  zorder=20, label='Uncond')
+                  zorder=20)
         # Conditional (orange)
         ax.quiver(current_positions[:, 0], current_positions[:, 1],
                   v_cond[:, 0], v_cond[:, 1],
                   alpha=0.9, scale=scale, color='orange', width=arrow_width,
-                  zorder=21, label='Cond')
+                  zorder=21)
         # CFG (purple)
         ax.quiver(current_positions[:, 0], current_positions[:, 1],
                   v_cfg[:, 0], v_cfg[:, 1],
                   alpha=1.0, scale=scale, color='purple', width=arrow_width * 1.3,
-                  zorder=22, label=f'CFG (w={guidance_scale})')
+                  zorder=22)
 
         ax.set_title("CFG Vector Field: Gray=Uncond | Orange=Cond | Purple=CFG", fontsize=12, fontweight="bold")
         ax.set_xlim(-4.5, 4.5)
