@@ -122,19 +122,24 @@ def main(cfg: DictConfig) -> None:
     model.to(device)
 
     # Configure optimizer with lower learning rate for fine-tuning
-    rectified_lr = cfg.training.learning_rate * 0.5
+    rectified_lr = 0.001  # Lower LR for stable finetuning
     optimizer = model.configure_optimizers(
-        weight_decay=cfg.training.weight_decay,
+        weight_decay=cfg.training.weight_decay * 0.1,  # Less regularization
         learning_rate=rectified_lr,
-        betas=(
-            1 - (cfg.data.n_samples / 5e5) * (1 - 0.9),
-            1 - (cfg.data.n_samples / 5e5) * (1 - 0.95)
-        ),
+        betas=(0.9, 0.99),  # Standard betas
     )
 
-    # Learning rate scheduler
-    n_rectified_epochs = cfg.training.n_epochs // 2  # Fewer epochs for fine-tuning
-    get_lr = lambda step: linear_decay_lr(step, n_rectified_epochs, rectified_lr)
+    # More epochs for better convergence
+    n_rectified_epochs = 3000
+
+    # Warmup + cosine decay schedule
+    warmup_epochs = 200
+    def get_lr(step):
+        if step < warmup_epochs:
+            return rectified_lr * (step + 1) / warmup_epochs
+        else:
+            progress = (step - warmup_epochs) / (n_rectified_epochs - warmup_epochs)
+            return rectified_lr * 0.5 * (1 + math.cos(math.pi * progress))
 
     # Loss function
     loss_fn = CFGRectifiedFlowLoss(sigma_min=cfg.training.sigma_min)
@@ -157,7 +162,7 @@ def main(cfg: DictConfig) -> None:
     # Generate coupled pairs from base model
     guidance_scale = cfg.visualization.get("guidance_scale", 2.0)
     logger.info(f"Generating coupled pairs from base model (guidance_scale={guidance_scale})...")
-    coupling_steps = 100
+    coupling_steps = 200  # More steps for accurate trajectories
     x0_data, x1_data = generate_coupled_pairs(
         base_model,
         n_samples=cfg.data.n_samples,
@@ -172,7 +177,7 @@ def main(cfg: DictConfig) -> None:
     model.train()
     optimizer.zero_grad(set_to_none=True)
 
-    batch_size = cfg.training.get("batch_size", 256)
+    batch_size = 512  # Larger batch for stable gradients
 
     for epoch in tqdm(range(n_rectified_epochs), desc="Training Rectified Flow"):
         model.zero_grad()
