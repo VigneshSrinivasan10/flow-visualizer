@@ -58,131 +58,107 @@ class CFGFlowMatchingModel:
         return trajectory
 
 
-def create_cfg_flow_animation(
+def create_cfg_trajectory_curvature_animation(
     trajectory: list[torch.Tensor],
     class_labels: torch.Tensor,
-    target_data: np.ndarray,
-    target_labels: np.ndarray,
     save_path: Path,
+    n_particles: int = 50,
     fps: int = 20,
     dpi: int = 100,
-    subsample: int = 1,
 ):
-    """Create flow animation with class-specific colors."""
-    trajectory_subset = trajectory[::subsample]
-    n_frames = len(trajectory_subset)
+    """
+    Create trajectory curvature animation with left-right flow layout.
 
-    fig, ax = plt.subplots(figsize=(8, 8))
+    Layout: Gaussian (source) on left, generated on right, with curved particle paths
+    flowing between them. Time slider at bottom shows progress.
+    Particles colored by class.
+    """
+    n_frames = len(trajectory)
+    n_samples = trajectory[0].shape[0]
     labels_np = class_labels.numpy()
 
-    def update(frame):
-        ax.clear()
-        data = trajectory_subset[frame].numpy()
-        t = (frame * subsample) / (len(trajectory) - 1)
+    # Offsets for left-right layout
+    x_offset = 2.5
 
-        # Plot generated samples by class
-        for c in range(3):
-            mask = labels_np == c
-            ax.scatter(
-                data[mask, 0],
-                data[mask, 1],
-                alpha=0.6,
-                s=20,
-                color=CLASS_COLORS[c],
-                edgecolors='white',
-                linewidth=0.3,
-                label=CLASS_NAMES[c] if frame == 0 else None,
-            )
-
-        # Plot target distribution (faded)
-        for c in range(3):
-            mask = target_labels == c
-            ax.scatter(
-                target_data[mask, 0],
-                target_data[mask, 1],
-                alpha=0.1,
-                s=5,
-                color=CLASS_COLORS[c],
-            )
-
-        ax.set_title(f"CFG Flow Matching: t = {t:.3f}", fontsize=16, fontweight="bold")
-        ax.set_xlim(-1.5, 1.5)
-        ax.set_ylim(-1.5, 1.5)
-        ax.set_aspect("equal")
-        ax.grid(True, alpha=0.3)
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
-
-        if frame == 0:
-            ax.legend(loc='upper right')
-
-    logger.info(f"Creating CFG flow animation with {n_frames} frames...")
-    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
-
-    writer = PillowWriter(fps=fps)
-    anim.save(save_path, writer=writer, dpi=dpi)
-    logger.info(f"CFG flow animation saved to {save_path}")
-    plt.close()
-
-
-def create_cfg_particle_trajectories_animation(
-    trajectory: list[torch.Tensor],
-    class_labels: torch.Tensor,
-    target_data: np.ndarray,
-    target_labels: np.ndarray,
-    save_path: Path,
-    n_particles: int = 100,
-    fps: int = 20,
-    dpi: int = 100,
-    subsample: int = 1,
-    trail_length: int = 10,
-):
-    """Create particle trajectories animation with class-specific colors."""
-    trajectory_subset = trajectory[::subsample]
-    n_frames = len(trajectory_subset)
-    labels_np = class_labels.numpy()
-
-    n_samples = trajectory_subset[0].shape[0]
+    # Select random particles to track (ensure we get some from each class)
     particle_indices = np.random.choice(n_samples, size=min(n_particles, n_samples), replace=False)
 
+    # Extract full particle paths and transform to left-right layout
     particle_paths = []
     particle_classes = []
     for idx in particle_indices:
-        path = np.array([traj[idx].numpy() for traj in trajectory_subset])
-        particle_paths.append(path)
+        path = []
+        for frame_idx, traj in enumerate(trajectory):
+            t = frame_idx / (n_frames - 1)
+            pt = traj[idx].numpy()
+            x_pos = pt[0] + x_offset * (2 * t - 1)
+            path.append([x_pos, pt[1]])
+        particle_paths.append(np.array(path))
         particle_classes.append(labels_np[idx])
     particle_paths = np.array(particle_paths)
     particle_classes = np.array(particle_classes)
 
-    fig, ax = plt.subplots(figsize=(8, 8))
+    # Static source (Gaussian) - ALL samples
+    all_source_data = trajectory[0].numpy()
+    all_source_shifted = all_source_data.copy()
+    all_source_shifted[:, 0] -= x_offset
+    source_labels = labels_np
+
+    # Generated endpoints - ALL samples
+    all_generated_data = trajectory[-1].numpy()
+    all_generated_shifted = all_generated_data.copy()
+    all_generated_shifted[:, 0] += x_offset
+
+    fig, ax = plt.subplots(figsize=(12, 6))
 
     def update(frame):
         ax.clear()
-        t = (frame * subsample) / (len(trajectory) - 1)
+        t = frame / (n_frames - 1)
 
-        # Plot target distribution (very faded)
+        # Plot static Gaussian source on left - colored by class
         for c in range(3):
-            mask = target_labels == c
+            mask = source_labels == c
             ax.scatter(
-                target_data[mask, 0],
-                target_data[mask, 1],
-                alpha=0.05,
-                s=3,
+                all_source_shifted[mask, 0],
+                all_source_shifted[mask, 1],
+                alpha=0.4,
+                s=15,
                 color=CLASS_COLORS[c],
+                edgecolors="none",
             )
 
-        # Plot particle trails and current positions
-        for i, (path, cls) in enumerate(zip(particle_paths, particle_classes)):
+        # Plot static generated on right - colored by class
+        for c in range(3):
+            mask = source_labels == c
+            ax.scatter(
+                all_generated_shifted[mask, 0],
+                all_generated_shifted[mask, 1],
+                alpha=0.4,
+                s=15,
+                color=CLASS_COLORS[c],
+                edgecolors="none",
+            )
+
+        # Draw full trajectory lines (faded)
+        for i, path in enumerate(particle_paths):
+            ax.plot(
+                path[:, 0],
+                path[:, 1],
+                alpha=0.15,
+                linewidth=1,
+                color="gray",
+            )
+
+        # Draw trajectory lines up to current frame
+        for i, path in enumerate(particle_paths):
+            cls = particle_classes[i]
             color = CLASS_COLORS[cls]
 
-            start_idx = max(0, frame - trail_length)
-            trail = path[start_idx : frame + 1]
-
-            if len(trail) > 1:
+            if frame > 0:
                 ax.plot(
-                    trail[:, 0],
-                    trail[:, 1],
-                    alpha=0.4,
+                    path[: frame + 1, 0],
+                    path[: frame + 1, 1],
+                    alpha=0.6,
                     linewidth=1.5,
                     color=color,
                 )
@@ -190,36 +166,44 @@ def create_cfg_particle_trajectories_animation(
             ax.scatter(
                 path[frame, 0],
                 path[frame, 1],
-                s=50,
+                s=30,
                 color=color,
                 edgecolors="black",
-                linewidth=1,
+                linewidth=0.5,
                 zorder=10,
             )
 
-        ax.set_title(
-            f"CFG Particle Trajectories: t = {t:.3f}\n{len(particle_indices)} particles",
-            fontsize=14,
-            fontweight="bold",
-        )
-        ax.set_xlim(-1.5, 1.5)
-        ax.set_ylim(-1.5, 1.5)
+        ax.set_title("CFG Trajectory Curvature", fontsize=14, fontweight="bold")
+        ax.set_xlim(-4.5, 4.5)
+        ax.set_ylim(-2.8, 2)
         ax.set_aspect("equal")
-        ax.grid(True, alpha=0.3)
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
+
+        # Remove ticks and box
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+        # Add time slider at bottom
+        slider_y = -2.4
+        ax.plot([-3.5, 3.5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
+        slider_x = -3.5 + 7.0 * t
+        ax.scatter([slider_x], [slider_y], s=100, color="black", zorder=20)
+        ax.text(-3.5, slider_y - 0.35, "t=0", ha="center", fontsize=10)
+        ax.text(3.5, slider_y - 0.35, "t=1", ha="center", fontsize=10)
+        ax.text(slider_x, slider_y + 0.25, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
 
         # Add legend
         for c in range(3):
             ax.scatter([], [], color=CLASS_COLORS[c], label=CLASS_NAMES[c], s=50)
-        ax.legend(loc='upper right')
+        ax.legend(loc='upper right', fontsize=9)
 
-    logger.info(f"Creating CFG particle trajectories animation with {n_frames} frames...")
+    logger.info(f"Creating CFG trajectory curvature animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
     writer = PillowWriter(fps=fps)
     anim.save(save_path, writer=writer, dpi=dpi)
-    logger.info(f"CFG particle trajectories animation saved to {save_path}")
+    logger.info(f"CFG trajectory curvature animation saved to {save_path}")
     plt.close()
 
 
@@ -227,120 +211,145 @@ def create_cfg_vector_field_animation(
     model: CFGFlowMatchingModel,
     trajectory: list[torch.Tensor],
     class_labels: torch.Tensor,
-    target_data: np.ndarray,
-    target_labels: np.ndarray,
     save_path: Path,
     guidance_scale: float = 2.0,
     fps: int = 20,
     dpi: int = 100,
-    subsample: int = 1,
-    grid_size: int = 12,
+    grid_size: int = 8,
 ):
     """
-    Create vector field animation showing conditional, unconditional, and CFG arrows.
+    Create vector field animation with left-right layout showing uncond/cond/CFG arrows.
 
+    Layout: Gaussian on left, generated on right, with 3 arrow types in the middle.
     - Gray arrows: Unconditional velocity
     - Orange arrows: Conditional velocity
-    - Purple arrows: Final CFG velocity (combination)
+    - Purple arrows: Final CFG velocity
+    Time slider at bottom.
     """
-    trajectory_subset = trajectory[::subsample]
-    n_frames = len(trajectory_subset)
+    n_frames = len(trajectory)
+    n_samples = trajectory[0].shape[0]
     labels_np = class_labels.numpy()
 
-    fig, ax = plt.subplots(figsize=(10, 10))
+    x_offset = 2.5
 
-    # Create grid for vector field
-    x = np.linspace(-1.3, 1.3, grid_size)
-    y = np.linspace(-1.3, 1.3, grid_size)
-    X, Y = np.meshgrid(x, y)
-    positions = np.stack([X.flatten(), Y.flatten()], axis=1)
+    # Static source and generated
+    all_source_data = trajectory[0].numpy()
+    all_source_shifted = all_source_data.copy()
+    all_source_shifted[:, 0] -= x_offset
+
+    all_generated_data = trajectory[-1].numpy()
+    all_generated_shifted = all_generated_data.copy()
+    all_generated_shifted[:, 0] += x_offset
+
+    fig, ax = plt.subplots(figsize=(12, 6))
 
     model.velocity_net.eval()
     device = model.device
 
-    # Use class 0 (left eye) for grid visualization
-    grid_class_labels = torch.zeros(len(positions), dtype=torch.long, device=device)
+    # Use class 0 for grid visualization
     null_class_idx = model.velocity_net.null_class_idx
 
     def update(frame):
         ax.clear()
-        data = trajectory_subset[frame].numpy()
-        t = (frame * subsample) / (len(trajectory) - 1)
+        t = frame / (n_frames - 1)
 
-        # Compute velocities at current time
+        # Current data position (shifted for left-right layout)
+        data = trajectory[frame].numpy()
+        data_shifted = data.copy()
+        data_shifted[:, 0] += x_offset * (2 * t - 1)
+
+        # Create grid for vector field at current data positions (subsampled)
+        grid_indices = np.random.choice(len(data_shifted), size=min(grid_size * grid_size, len(data_shifted)), replace=False)
+        grid_positions = data_shifted[grid_indices]
+        grid_classes = labels_np[grid_indices]
+
+        # Compute velocities
         with torch.no_grad():
-            pos_tensor = torch.from_numpy(positions).float().to(device)
-            t_tensor = torch.ones(len(positions), device=device) * t
+            # Use original (non-shifted) positions for velocity computation
+            pos_tensor = torch.from_numpy(data[grid_indices]).float().to(device)
+            t_tensor = torch.ones(len(grid_indices), device=device) * t
+            class_tensor = torch.from_numpy(grid_classes).long().to(device)
 
             # Conditional velocity
-            v_cond = model.velocity_net(pos_tensor, time=t_tensor, class_labels=grid_class_labels).cpu().numpy()
+            v_cond = model.velocity_net(pos_tensor, time=t_tensor, class_labels=class_tensor).cpu().numpy()
 
             # Unconditional velocity
-            null_labels = torch.full_like(grid_class_labels, null_class_idx)
+            null_labels = torch.full_like(class_tensor, null_class_idx)
             v_uncond = model.velocity_net(pos_tensor, time=t_tensor, class_labels=null_labels).cpu().numpy()
 
             # CFG velocity
             v_cfg = v_uncond + guidance_scale * (v_cond - v_uncond)
 
-        U_uncond = v_uncond[:, 0].reshape(grid_size, grid_size)
-        V_uncond = v_uncond[:, 1].reshape(grid_size, grid_size)
-        U_cond = v_cond[:, 0].reshape(grid_size, grid_size)
-        V_cond = v_cond[:, 1].reshape(grid_size, grid_size)
-        U_cfg = v_cfg[:, 0].reshape(grid_size, grid_size)
-        V_cfg = v_cfg[:, 1].reshape(grid_size, grid_size)
-
-        # Plot vector fields with different colors
-        # Unconditional (gray)
-        ax.quiver(X, Y, U_uncond, V_uncond, alpha=0.4, scale=15, color='gray', width=0.004,
-                  label='Unconditional')
-        # Conditional (orange)
-        ax.quiver(X, Y, U_cond, V_cond, alpha=0.5, scale=15, color='orange', width=0.004,
-                  label='Conditional')
-        # CFG (purple) - thicker
-        ax.quiver(X, Y, U_cfg, V_cfg, alpha=0.7, scale=15, color='purple', width=0.006,
-                  label=f'CFG (w={guidance_scale})')
-
-        # Plot current distribution
+        # Plot static source on left
         for c in range(3):
             mask = labels_np == c
             ax.scatter(
-                data[mask, 0],
-                data[mask, 1],
-                alpha=0.5,
+                all_source_shifted[mask, 0],
+                all_source_shifted[mask, 1],
+                alpha=0.3,
                 s=12,
+                color=CLASS_COLORS[c],
+                edgecolors="none",
+            )
+
+        # Plot static generated on right
+        for c in range(3):
+            mask = labels_np == c
+            ax.scatter(
+                all_generated_shifted[mask, 0],
+                all_generated_shifted[mask, 1],
+                alpha=0.3,
+                s=12,
+                color=CLASS_COLORS[c],
+                edgecolors="none",
+            )
+
+        # Plot current distribution (moving)
+        for c in range(3):
+            mask = labels_np == c
+            ax.scatter(
+                data_shifted[mask, 0],
+                data_shifted[mask, 1],
+                alpha=0.5,
+                s=15,
                 color=CLASS_COLORS[c],
                 edgecolors='white',
                 linewidth=0.3,
             )
 
-        # Plot target distribution (faded)
-        for c in range(3):
-            mask = target_labels == c
-            ax.scatter(
-                target_data[mask, 0],
-                target_data[mask, 1],
-                alpha=0.08,
-                s=3,
-                color=CLASS_COLORS[c],
-            )
+        # Plot vector fields at grid positions
+        scale = 8
+        # Unconditional (gray)
+        ax.quiver(grid_positions[:, 0], grid_positions[:, 1],
+                  v_uncond[:, 0], v_uncond[:, 1],
+                  alpha=0.5, scale=scale, color='gray', width=0.005)
+        # Conditional (orange)
+        ax.quiver(grid_positions[:, 0], grid_positions[:, 1],
+                  v_cond[:, 0], v_cond[:, 1],
+                  alpha=0.6, scale=scale, color='orange', width=0.005)
+        # CFG (purple) - thicker
+        ax.quiver(grid_positions[:, 0], grid_positions[:, 1],
+                  v_cfg[:, 0], v_cfg[:, 1],
+                  alpha=0.8, scale=scale, color='purple', width=0.007)
 
-        ax.set_title(
-            f"CFG Vector Field: t = {t:.3f}\nGray=Uncond | Orange=Cond | Purple=CFG",
-            fontsize=12,
-            fontweight="bold",
-        )
-        ax.set_xlim(-1.5, 1.5)
-        ax.set_ylim(-1.5, 1.5)
+        ax.set_title("CFG Vector Field\nGray=Uncond | Orange=Cond | Purple=CFG", fontsize=12, fontweight="bold")
+        ax.set_xlim(-4.5, 4.5)
+        ax.set_ylim(-2.8, 2)
         ax.set_aspect("equal")
-        ax.grid(True, alpha=0.3)
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
 
-        # Add legend for arrows
-        ax.quiver([], [], [], [], color='gray', label='Unconditional')
-        ax.quiver([], [], [], [], color='orange', label='Conditional')
-        ax.quiver([], [], [], [], color='purple', label=f'CFG (w={guidance_scale})')
-        ax.legend(loc='upper right', fontsize=9)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+        # Time slider
+        slider_y = -2.4
+        ax.plot([-3.5, 3.5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
+        slider_x = -3.5 + 7.0 * t
+        ax.scatter([slider_x], [slider_y], s=100, color="black", zorder=20)
+        ax.text(-3.5, slider_y - 0.35, "t=0", ha="center", fontsize=10)
+        ax.text(3.5, slider_y - 0.35, "t=1", ha="center", fontsize=10)
+        ax.text(slider_x, slider_y + 0.25, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
 
     logger.info(f"Creating CFG vector field animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
@@ -378,10 +387,6 @@ def main(cfg: DictConfig) -> None:
 
     logger.info("Model loaded successfully")
 
-    # Get target data with labels
-    target_data = dataset.data.numpy()
-    target_labels = dataset.labels.numpy()
-
     # Generate samples for each class
     n_vis_samples = min(2000, cfg.data.n_samples)
     n_per_class = n_vis_samples // 3
@@ -411,30 +416,14 @@ def main(cfg: DictConfig) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Create animations
-    logger.info("Creating CFG flow animation...")
-    create_cfg_flow_animation(
+    logger.info("Creating CFG trajectory curvature animation...")
+    create_cfg_trajectory_curvature_animation(
         trajectory,
         class_labels_cpu,
-        target_data,
-        target_labels,
-        output_dir / "cfg_flow_animation.gif",
-        fps=cfg.visualization.get("animation_fps", 20),
-        dpi=cfg.visualization.get("animation_dpi", 100),
-        subsample=cfg.visualization.get("animation_subsample", 1),
-    )
-
-    logger.info("Creating CFG particle trajectories animation...")
-    create_cfg_particle_trajectories_animation(
-        trajectory,
-        class_labels_cpu,
-        target_data,
-        target_labels,
-        output_dir / "cfg_particle_trajectories.gif",
+        output_dir / "cfg_trajectory_curvature.gif",
         n_particles=cfg.visualization.get("n_particles", 100),
         fps=cfg.visualization.get("animation_fps", 20),
         dpi=cfg.visualization.get("animation_dpi", 100),
-        subsample=cfg.visualization.get("animation_subsample", 1),
-        trail_length=cfg.visualization.get("trail_length", 10),
     )
 
     logger.info("Creating CFG vector field animation...")
@@ -442,14 +431,11 @@ def main(cfg: DictConfig) -> None:
         model,
         trajectory,
         class_labels_cpu,
-        target_data,
-        target_labels,
         output_dir / "cfg_vector_field.gif",
         guidance_scale=guidance_scale,
         fps=cfg.visualization.get("animation_fps", 20),
         dpi=cfg.visualization.get("animation_dpi", 100),
-        subsample=cfg.visualization.get("animation_subsample", 1),
-        grid_size=cfg.visualization.get("grid_size", 12),
+        grid_size=cfg.visualization.get("grid_size", 10),
     )
 
     logger.info("CFG Visualization complete!")
