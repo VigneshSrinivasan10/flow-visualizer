@@ -353,39 +353,36 @@ def create_cfg_vector_field_animation(
                 edgecolors="none",
             )
 
-        # Draw full trajectory paths (faded)
-        for i, c in enumerate(rep_classes):
+        # Draw full trajectory path for active point only (faded)
+        c = rep_classes[active_point]
+        ax.plot(
+            rep_paths[active_point, :, 0],
+            rep_paths[active_point, :, 1],
+            alpha=0.2,
+            linewidth=2,
+            color=CLASS_COLORS[c],
+        )
+
+        # Draw trajectory up to current frame for active point
+        if local_frame > 0:
             ax.plot(
-                rep_paths[i, :, 0],
-                rep_paths[i, :, 1],
-                alpha=0.2,
-                linewidth=2,
+                rep_paths[active_point, :local_frame+1, 0],
+                rep_paths[active_point, :local_frame+1, 1],
+                alpha=0.6,
+                linewidth=3,
                 color=CLASS_COLORS[c],
             )
 
-        # Draw trajectory up to current frame for each point
-        for i, c in enumerate(rep_classes):
-            pf = point_frames[i]
-            if pf > 0:
-                ax.plot(
-                    rep_paths[i, :pf+1, 0],
-                    rep_paths[i, :pf+1, 1],
-                    alpha=0.6,
-                    linewidth=3,
-                    color=CLASS_COLORS[c],
-                )
-
-        # Draw all points (large, highlighted)
-        for i, c in enumerate(rep_classes):
-            ax.scatter(
-                current_positions[i, 0],
-                current_positions[i, 1],
-                s=200,
-                color=CLASS_COLORS[c],
-                edgecolors='black',
-                linewidth=2,
-                zorder=15,
-            )
+        # Draw only the active point (large, highlighted)
+        ax.scatter(
+            current_positions[active_point, 0],
+            current_positions[active_point, 1],
+            s=200,
+            color=CLASS_COLORS[c],
+            edgecolors='black',
+            linewidth=2,
+            zorder=15,
+        )
 
         # Plot velocity arrows only for the active point
         scale = 30
