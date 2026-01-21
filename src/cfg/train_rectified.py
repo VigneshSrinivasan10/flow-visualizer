@@ -20,20 +20,22 @@ logger = logging.getLogger(__name__)
 
 
 class CFGRectifiedFlowLoss:
-    """Rectified Flow loss for CFG - trains on coupled pairs for straight trajectories."""
+    """Rectified Flow loss for CFG - trains on coupled pairs for straight trajectories.
 
-    def __init__(self, sigma_min: float = 1e-4):
+    Trains BOTH conditional and unconditional predictions to output straight-line
+    velocities, so CFG interpolation works correctly at inference.
+    """
+
+    def __init__(self, sigma_min: float = 1e-4, null_class_idx: int = 3):
         self.sigma_min = sigma_min
+        self.null_class_idx = null_class_idx
 
     def __call__(self, flow_model, x0, x1, class_labels):
         """
         Compute rectified flow loss with class conditioning.
 
-        Args:
-            flow_model: The velocity network
-            x0: Source samples (noise)
-            x1: Target samples (generated from base model)
-            class_labels: Class labels for conditioning
+        Trains both conditional (with class) and unconditional (null class)
+        predictions to output the same straight-line velocity.
         """
         t = torch.rand(x0.shape[0], device=x0.device)
 
@@ -43,10 +45,17 @@ class CFGRectifiedFlowLoss:
         # Target velocity is constant: x1 - x0 (straight line)
         target_velocity = x1 - x0
 
-        # Predicted velocity (with class conditioning)
-        predicted_velocity = flow_model(x_t, time=t, class_labels=class_labels)
+        # Conditional loss (with class labels)
+        pred_cond = flow_model(x_t, time=t, class_labels=class_labels)
+        loss_cond = (pred_cond - target_velocity).square().mean()
 
-        return (predicted_velocity - target_velocity).square().mean()
+        # Unconditional loss (null class) - same target!
+        null_labels = torch.full_like(class_labels, self.null_class_idx)
+        pred_uncond = flow_model(x_t, time=t, class_labels=null_labels)
+        loss_uncond = (pred_uncond - target_velocity).square().mean()
+
+        # Combined loss
+        return loss_cond + loss_uncond
 
 
 def generate_coupled_pairs(base_model, n_samples, class_labels, n_steps=100, device="cpu", guidance_scale=2.0):
@@ -142,7 +151,10 @@ def main(cfg: DictConfig) -> None:
             return rectified_lr * 0.5 * (1 + math.cos(math.pi * progress))
 
     # Loss function
-    loss_fn = CFGRectifiedFlowLoss(sigma_min=cfg.training.sigma_min)
+    loss_fn = CFGRectifiedFlowLoss(
+        sigma_min=cfg.training.sigma_min,
+        null_class_idx=dataset.num_classes,  # null class index
+    )
 
     # Generate class labels (same distribution as training)
     n_per_class = cfg.data.n_samples // dataset.num_classes
