@@ -244,14 +244,15 @@ def create_cfg_vector_field_animation(
 
     # Select 3 representative points per class (9 total), ordered by class
     # Order: class0_pt0, class0_pt1, class0_pt2, class1_pt0, class1_pt1, class1_pt2, ...
+    # Use fixed seed for reproducibility, random selection for visual diversity
     n_points_per_class = 3
+    rng = np.random.RandomState(42)
     representative_indices = []
     for c in range(3):
         class_indices = np.where(labels_np == c)[0]
-        # Pick 3 evenly spaced points from each class
-        for j in range(n_points_per_class):
-            idx = class_indices[(j + 1) * len(class_indices) // (n_points_per_class + 1)]
-            representative_indices.append(idx)
+        # Randomly pick 3 distinct points from each class
+        chosen = rng.choice(class_indices, size=n_points_per_class, replace=False)
+        representative_indices.extend(chosen)
     representative_indices = np.array(representative_indices)
     rep_classes = labels_np[representative_indices]
     n_rep_points = len(representative_indices)  # 9
