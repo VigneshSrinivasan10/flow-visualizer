@@ -65,6 +65,7 @@ def create_cfg_trajectory_curvature_animation(
     n_particles: int = 50,
     fps: int = 20,
     dpi: int = 100,
+    guidance_scale: float = 2.0,
 ):
     """
     Create trajectory curvature animation with left-right flow layout.
@@ -177,7 +178,8 @@ def create_cfg_trajectory_curvature_animation(
                 zorder=10,
             )
 
-        ax.set_title("CFG Trajectory Curvature", fontsize=14, fontweight="bold")
+        title = "Unconditional" if guidance_scale == 0 else f"CFG Scale = {guidance_scale:.0f}"
+        ax.set_title(title, fontsize=14, fontweight="bold")
         ax.set_xlim(-4.5, 4.5)
         ax.set_ylim(-2.8, 2)
         ax.set_aspect("equal")
@@ -479,16 +481,6 @@ def main(cfg: DictConfig) -> None:
         torch.full((n_vis_samples - 2 * n_per_class,), 2, dtype=torch.long),
     ]).to(device)
 
-    # Generate trajectory with CFG
-    logger.info("Generating trajectory with CFG...")
-    guidance_scale = cfg.visualization.get("guidance_scale", 2.0)
-    trajectory = model.sample_trajectory(
-        n_samples=n_vis_samples,
-        class_labels=class_labels,
-        n_steps=cfg.visualization.n_sampling_steps,
-        guidance_scale=guidance_scale,
-    )
-
     # Move class_labels to CPU for visualization
     class_labels_cpu = class_labels.cpu()
 
@@ -496,28 +488,27 @@ def main(cfg: DictConfig) -> None:
     output_dir = Path(cfg.visualization.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create animations
-    logger.info("Creating CFG trajectory curvature animation...")
-    create_cfg_trajectory_curvature_animation(
-        trajectory,
-        class_labels_cpu,
-        output_dir / "cfg_trajectory_curvature.gif",
-        n_particles=cfg.visualization.get("n_particles", 100),
-        fps=cfg.visualization.get("animation_fps", 20),
-        dpi=cfg.visualization.get("animation_dpi", 100),
-    )
+    # Generate trajectory animations for varying CFG levels
+    cfg_scales = [0, 1, 2, 3, 4, 5]
+    for guidance_scale in cfg_scales:
+        logger.info(f"Generating trajectory with CFG scale {guidance_scale}...")
+        trajectory = model.sample_trajectory(
+            n_samples=n_vis_samples,
+            class_labels=class_labels,
+            n_steps=cfg.visualization.n_sampling_steps,
+            guidance_scale=float(guidance_scale),
+        )
 
-    logger.info("Creating CFG vector field animation...")
-    create_cfg_vector_field_animation(
-        model,
-        trajectory,
-        class_labels_cpu,
-        output_dir / "cfg_vector_field.gif",
-        guidance_scale=guidance_scale,
-        fps=cfg.visualization.get("animation_fps", 20),
-        dpi=cfg.visualization.get("animation_dpi", 100),
-        grid_size=cfg.visualization.get("grid_size", 10),
-    )
+        logger.info(f"Creating CFG trajectory curvature animation (scale={guidance_scale})...")
+        create_cfg_trajectory_curvature_animation(
+            trajectory,
+            class_labels_cpu,
+            output_dir / f"cfg_trajectory_curvature_{guidance_scale}.gif",
+            n_particles=cfg.visualization.get("n_particles", 100),
+            fps=cfg.visualization.get("animation_fps", 20),
+            dpi=cfg.visualization.get("animation_dpi", 100),
+            guidance_scale=float(guidance_scale),
+        )
 
     logger.info("CFG Visualization complete!")
 
