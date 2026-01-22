@@ -7,19 +7,25 @@ from torch.utils.data import Dataset, DataLoader
 class FaceDataset(Dataset):
     """Face-shaped dataset with class labels: left eye (0), right eye (1), mouth (2)."""
 
-    def __init__(self, n_samples: int = 10000):
+    def __init__(
+        self,
+        n_samples: int = 10000,
+        left_eye_center: tuple[float, float] = (-0.5, 0.5),
+        right_eye_center: tuple[float, float] = (0.5, 0.5),
+        eye_sigma: float = 0.15,
+    ):
         n_per_class = n_samples // 3
 
-        # Left eye (class 0) - centered at (-0.5, 0.5)
-        left_eye = torch.randn(n_per_class, 2) * 0.15
-        left_eye[:, 0] -= 0.5
-        left_eye[:, 1] += 0.5
+        # Left eye (class 0)
+        left_eye = torch.randn(n_per_class, 2) * eye_sigma
+        left_eye[:, 0] += left_eye_center[0]
+        left_eye[:, 1] += left_eye_center[1]
         left_eye_labels = torch.zeros(n_per_class, dtype=torch.long)
 
-        # Right eye (class 1) - centered at (0.5, 0.5)
-        right_eye = torch.randn(n_per_class, 2) * 0.15
-        right_eye[:, 0] += 0.5
-        right_eye[:, 1] += 0.5
+        # Right eye (class 1)
+        right_eye = torch.randn(n_per_class, 2) * eye_sigma
+        right_eye[:, 0] += right_eye_center[0]
+        right_eye[:, 1] += right_eye_center[1]
         right_eye_labels = torch.ones(n_per_class, dtype=torch.long)
 
         # Mouth (class 2) - arc at bottom

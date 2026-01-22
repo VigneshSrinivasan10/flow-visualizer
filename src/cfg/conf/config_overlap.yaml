@@ -1,0 +1,41 @@
+# Configuration for CFG Flow Visualizer - Overlapping Eyes Variant
+
+# Data settings
+data:
+  n_samples: 10000
+  left_eye_center: [-0.1, 0.5]
+  right_eye_center: [0.1, 0.5]
+  eye_sigma: 0.15
+
+# Model settings (same as base flow model + CFG)
+model:
+  width: 512
+  n_blocks: 5
+  class_emb_dim: 32
+
+# Training settings (same as base flow model + CFG)
+training:
+  n_epochs: 2000
+  learning_rate: 0.005
+  weight_decay: 0.01
+  sigma_min: 1e-4
+  gradient_clip: 1.0
+  lr_scheduler: linear_decay
+  device: cpu
+  seed: 42
+  output_dir: outputs/cfg_overlap/models
+  log_interval: 10
+  class_dropout_prob: 0.2
+
+# Visualization settings
+visualization:
+  n_sampling_steps: 100
+  output_dir: outputs/cfg_overlap/visualizations
+  grid_size: 20
+  animation_fps: 20
+  animation_dpi: 100
+  animation_subsample: 1
+  n_particles: 100
+  trail_length: 10
+  density_grid_size: 100
+  guidance_scale: 2.0

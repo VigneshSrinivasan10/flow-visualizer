@@ -479,7 +479,12 @@ def main(cfg: DictConfig) -> None:
 
     # Load model
     logger.info("Loading model...")
-    dataset = FaceDataset(n_samples=cfg.data.n_samples)
+    dataset = FaceDataset(
+        n_samples=cfg.data.n_samples,
+        left_eye_center=tuple(cfg.data.get('left_eye_center', [-0.5, 0.5])),
+        right_eye_center=tuple(cfg.data.get('right_eye_center', [0.5, 0.5])),
+        eye_sigma=cfg.data.get('eye_sigma', 0.15),
+    )
 
     velocity_net = CFGFlowMLP(
         width=cfg.model.width,
