@@ -116,29 +116,53 @@ def create_cfg_trajectory_curvature_animation(
         ax.clear()
         t = frame / (n_frames - 1)
 
-        # Plot static Gaussian source on left - colored by class
-        for c in range(3):
-            mask = source_labels == c
+        # Plot static Gaussian source on left
+        if guidance_scale == 0:
+            # Unconditional: single color for all points
             ax.scatter(
-                all_source_shifted[mask, 0],
-                all_source_shifted[mask, 1],
+                all_source_shifted[:, 0],
+                all_source_shifted[:, 1],
                 alpha=0.4,
                 s=15,
-                color=CLASS_COLORS[c],
+                color="gray",
                 edgecolors="none",
             )
+        else:
+            # Conditional: colored by class
+            for c in range(3):
+                mask = source_labels == c
+                ax.scatter(
+                    all_source_shifted[mask, 0],
+                    all_source_shifted[mask, 1],
+                    alpha=0.4,
+                    s=15,
+                    color=CLASS_COLORS[c],
+                    edgecolors="none",
+                )
 
-        # Plot static generated on right - colored by class
-        for c in range(3):
-            mask = source_labels == c
+        # Plot static generated on right
+        if guidance_scale == 0:
+            # Unconditional: single color for all points
             ax.scatter(
-                all_generated_shifted[mask, 0],
-                all_generated_shifted[mask, 1],
+                all_generated_shifted[:, 0],
+                all_generated_shifted[:, 1],
                 alpha=0.4,
                 s=15,
-                color=CLASS_COLORS[c],
+                color="gray",
                 edgecolors="none",
             )
+        else:
+            # Conditional: colored by class
+            for c in range(3):
+                mask = source_labels == c
+                ax.scatter(
+                    all_generated_shifted[mask, 0],
+                    all_generated_shifted[mask, 1],
+                    alpha=0.4,
+                    s=15,
+                    color=CLASS_COLORS[c],
+                    edgecolors="none",
+                )
 
         # Add distribution labels
         ax.text(-x_offset, 1.8, "Source Distribution", ha="center", fontsize=11, fontweight="bold")
@@ -156,8 +180,7 @@ def create_cfg_trajectory_curvature_animation(
 
         # Draw trajectory lines up to current frame
         for i, path in enumerate(particle_paths):
-            cls = particle_classes[i]
-            color = CLASS_COLORS[cls]
+            color = "gray" if guidance_scale == 0 else CLASS_COLORS[particle_classes[i]]
 
             if frame > 0:
                 ax.plot(
@@ -199,10 +222,11 @@ def create_cfg_trajectory_curvature_animation(
         ax.text(3.5, slider_y - 0.35, "t=1", ha="center", fontsize=10)
         ax.text(slider_x, slider_y + 0.25, f"t={t:.2f}", ha="center", fontsize=9, fontweight="bold")
 
-        # Add legend
-        for c in range(3):
-            ax.scatter([], [], color=CLASS_COLORS[c], label=CLASS_NAMES[c], s=50)
-        ax.legend(loc='upper right', fontsize=9)
+        # Add legend (only for conditional models)
+        if guidance_scale != 0:
+            for c in range(3):
+                ax.scatter([], [], color=CLASS_COLORS[c], label=CLASS_NAMES[c], s=50)
+            ax.legend(loc='upper right', fontsize=9)
 
     logger.info(f"Creating CFG trajectory curvature animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
