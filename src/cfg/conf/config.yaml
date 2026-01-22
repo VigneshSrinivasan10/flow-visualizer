@@ -27,7 +27,7 @@ training:
 # Visualization settings
 visualization:
   n_sampling_steps: 100
-  output_dir: outputs/cfg/visualizations
+  output_dir: outputs/visualizations
   grid_size: 20
   animation_fps: 20
   animation_dpi: 100
