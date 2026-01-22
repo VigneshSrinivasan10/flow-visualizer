@@ -118,13 +118,13 @@ def create_cfg_trajectory_curvature_animation(
 
         # Plot static Gaussian source on left
         if guidance_scale == 0:
-            # Unconditional: single color for all points
+            # Unconditional: blue for gaussian
             ax.scatter(
                 all_source_shifted[:, 0],
                 all_source_shifted[:, 1],
                 alpha=0.4,
                 s=15,
-                color="gray",
+                color="blue",
                 edgecolors="none",
             )
         else:
@@ -142,13 +142,13 @@ def create_cfg_trajectory_curvature_animation(
 
         # Plot static generated on right
         if guidance_scale == 0:
-            # Unconditional: single color for all points
+            # Unconditional: red for data
             ax.scatter(
                 all_generated_shifted[:, 0],
                 all_generated_shifted[:, 1],
                 alpha=0.4,
                 s=15,
-                color="gray",
+                color="red",
                 edgecolors="none",
             )
         else:
@@ -180,7 +180,7 @@ def create_cfg_trajectory_curvature_animation(
 
         # Draw trajectory lines up to current frame
         for i, path in enumerate(particle_paths):
-            color = "gray" if guidance_scale == 0 else CLASS_COLORS[particle_classes[i]]
+            color = "gold" if guidance_scale == 0 else CLASS_COLORS[particle_classes[i]]
 
             if frame > 0:
                 ax.plot(
