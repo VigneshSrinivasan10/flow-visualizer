@@ -39,6 +39,13 @@ outputs/*
 outputs/visualizations/*
 !outputs/visualizations/*.gif
 !outputs/visualizations/*.png
+!outputs/cfg_overlap/
+outputs/cfg_overlap/*
+!outputs/cfg_overlap/visualizations/
+outputs/cfg_overlap/visualizations/*
+!outputs/cfg_overlap/visualizations/*.gif
+!outputs/cfg_overlap/visualizations/*.png
+!outputs/cfg_overlap/*.png
 *.pt
 *.pth
 *.ckpt
