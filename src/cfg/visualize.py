@@ -139,6 +139,10 @@ def create_cfg_trajectory_curvature_animation(
                 edgecolors="none",
             )
 
+        # Add distribution labels
+        ax.text(-x_offset, 1.8, "Source Distribution", ha="center", fontsize=11, fontweight="bold")
+        ax.text(x_offset, 1.8, "Target Distribution", ha="center", fontsize=11, fontweight="bold")
+
         # Draw full trajectory lines (faded)
         for i, path in enumerate(particle_paths):
             ax.plot(
@@ -353,6 +357,10 @@ def create_cfg_vector_field_animation(
                 color=CLASS_COLORS[c],
                 edgecolors="none",
             )
+
+        # Add distribution labels
+        ax.text(-x_offset, 1.8, "Source Distribution", ha="center", fontsize=11, fontweight="bold")
+        ax.text(x_offset, 1.8, "Target Distribution", ha="center", fontsize=11, fontweight="bold")
 
         # Draw full trajectory path for active point only (faded)
         c = rep_classes[active_point]
