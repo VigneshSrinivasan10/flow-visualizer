@@ -472,38 +472,36 @@ def plot_cfg_comparison(
     dataset: FaceDataset,
     cfg_values: list = [0, 1, 3, 5, 7, 9],
     n_samples: int = 2000,
-    figsize: tuple = (18, 6),
+    figsize: tuple = (18, 9),
     save_path: Path = None,
     dpi: int = 150,
 ):
     """
-    Create static 2×6 CFG comparison grid.
+    Create static 3×6 CFG comparison grid.
 
-    Rows: Target Class 0 (top), Target Class 1 (bottom)
+    Rows: Target Class 0 (left eye), Target Class 1 (right eye), Target Class 2 (mouth)
     Columns: Different CFG values
     Each panel shows generated samples colored by target class,
-    with gray background showing reference distribution.
+    with gray background showing ALL training data.
     """
     n_cols = len(cfg_values)
-    fig, axes = plt.subplots(2, n_cols, figsize=figsize)
+    fig, axes = plt.subplots(3, n_cols, figsize=figsize)
 
     # Get reference data from dataset (for background)
     all_data = dataset.data.numpy()
     all_labels = dataset.labels.numpy()
 
-    # Class colors: blue for class 0, red for class 1
-    target_colors = ['#1f77b4', '#d62728']
-
     # Get class centers for accuracy calculation
-    class_0_mask = all_labels == 0
-    class_1_mask = all_labels == 1
-    class_0_center = all_data[class_0_mask].mean(axis=0)
-    class_1_center = all_data[class_1_mask].mean(axis=0)
+    class_centers = []
+    for c in range(3):
+        mask = all_labels == c
+        class_centers.append(all_data[mask].mean(axis=0))
+    class_centers = np.array(class_centers)
 
     device = model.device
 
     for col, cfg_val in enumerate(cfg_values):
-        for row, target_class in enumerate([0, 1]):
+        for row, target_class in enumerate([0, 1, 2]):
             ax = axes[row, col]
 
             # Generate samples targeting this class
@@ -517,14 +515,12 @@ def plot_cfg_comparison(
                     guidance_scale=float(cfg_val),
                 ).numpy()
 
-            # Plot background (other class reference data) in gray
-            other_class = 1 - target_class
-            other_mask = all_labels == other_class
+            # Plot ALL training data as gray background
             ax.scatter(
-                all_data[other_mask, 0],
-                all_data[other_mask, 1],
-                alpha=0.3,
-                s=8,
+                all_data[:, 0],
+                all_data[:, 1],
+                alpha=0.15,
+                s=5,
                 color='lightgray',
                 edgecolors='none',
             )
@@ -535,17 +531,17 @@ def plot_cfg_comparison(
                 generated[:, 1],
                 alpha=0.5,
                 s=10,
-                color=target_colors[target_class],
+                color=CLASS_COLORS[target_class],
                 edgecolors='none',
             )
 
-            # Calculate accuracy: what fraction of samples are closer to the target class center?
-            dist_to_class_0 = np.linalg.norm(generated - class_0_center, axis=1)
-            dist_to_class_1 = np.linalg.norm(generated - class_1_center, axis=1)
-            if target_class == 0:
-                correct = (dist_to_class_0 < dist_to_class_1).sum()
-            else:
-                correct = (dist_to_class_1 < dist_to_class_0).sum()
+            # Calculate accuracy: what fraction of samples are closest to target class center?
+            distances = np.array([
+                np.linalg.norm(generated - center, axis=1)
+                for center in class_centers
+            ])  # Shape: (3, n_samples)
+            closest_class = distances.argmin(axis=0)
+            correct = (closest_class == target_class).sum()
             accuracy = 100.0 * correct / n_samples
 
             # Add accuracy label
@@ -568,7 +564,7 @@ def plot_cfg_comparison(
             if row == 0:
                 ax.set_title(f"CFG = {cfg_val}", fontsize=10, fontweight='bold')
             if col == 0:
-                ax.set_ylabel(f"Target Class {target_class}", fontsize=10)
+                ax.set_ylabel(f"{CLASS_NAMES[target_class]}", fontsize=10)
 
             # Clean up axes
             ax.set_xticks([])
@@ -576,7 +572,7 @@ def plot_cfg_comparison(
             ax.grid(True, alpha=0.2)
 
     # Main title
-    fig.suptitle("CFG Comparison: Both Classes", fontsize=12, fontweight='bold')
+    fig.suptitle("CFG Comparison: All Classes", fontsize=12, fontweight='bold')
     plt.tight_layout()
 
     if save_path:
