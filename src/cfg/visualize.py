@@ -467,6 +467,126 @@ def create_cfg_vector_field_animation(
     plt.close()
 
 
+def plot_cfg_comparison(
+    model: CFGFlowMatchingModel,
+    dataset: FaceDataset,
+    cfg_values: list = [0, 1, 3, 5, 7, 9],
+    n_samples: int = 2000,
+    figsize: tuple = (18, 6),
+    save_path: Path = None,
+    dpi: int = 150,
+):
+    """
+    Create static 2×6 CFG comparison grid.
+
+    Rows: Target Class 0 (top), Target Class 1 (bottom)
+    Columns: Different CFG values
+    Each panel shows generated samples colored by target class,
+    with gray background showing reference distribution.
+    """
+    n_cols = len(cfg_values)
+    fig, axes = plt.subplots(2, n_cols, figsize=figsize)
+
+    # Get reference data from dataset (for background)
+    all_data = dataset.data.numpy()
+    all_labels = dataset.labels.numpy()
+
+    # Class colors: blue for class 0, red for class 1
+    target_colors = ['#1f77b4', '#d62728']
+
+    # Get class centers for accuracy calculation
+    class_0_mask = all_labels == 0
+    class_1_mask = all_labels == 1
+    class_0_center = all_data[class_0_mask].mean(axis=0)
+    class_1_center = all_data[class_1_mask].mean(axis=0)
+
+    device = model.device
+
+    for col, cfg_val in enumerate(cfg_values):
+        for row, target_class in enumerate([0, 1]):
+            ax = axes[row, col]
+
+            # Generate samples targeting this class
+            class_labels = torch.full((n_samples,), target_class, dtype=torch.long, device=device)
+
+            with torch.no_grad():
+                generated = model.sample(
+                    n_samples=n_samples,
+                    class_labels=class_labels,
+                    n_steps=100,
+                    guidance_scale=float(cfg_val),
+                ).numpy()
+
+            # Plot background (other class reference data) in gray
+            other_class = 1 - target_class
+            other_mask = all_labels == other_class
+            ax.scatter(
+                all_data[other_mask, 0],
+                all_data[other_mask, 1],
+                alpha=0.3,
+                s=8,
+                color='lightgray',
+                edgecolors='none',
+            )
+
+            # Plot generated samples in target color
+            ax.scatter(
+                generated[:, 0],
+                generated[:, 1],
+                alpha=0.5,
+                s=10,
+                color=target_colors[target_class],
+                edgecolors='none',
+            )
+
+            # Calculate accuracy: what fraction of samples are closer to the target class center?
+            dist_to_class_0 = np.linalg.norm(generated - class_0_center, axis=1)
+            dist_to_class_1 = np.linalg.norm(generated - class_1_center, axis=1)
+            if target_class == 0:
+                correct = (dist_to_class_0 < dist_to_class_1).sum()
+            else:
+                correct = (dist_to_class_1 < dist_to_class_0).sum()
+            accuracy = 100.0 * correct / n_samples
+
+            # Add accuracy label
+            ax.text(
+                0.05, 0.95,
+                f"Correct: {accuracy:.1f}%",
+                transform=ax.transAxes,
+                fontsize=9,
+                verticalalignment='top',
+                color='green' if accuracy > 95 else 'red',
+                fontweight='bold',
+            )
+
+            # Set consistent axis limits
+            ax.set_xlim(-2, 2)
+            ax.set_ylim(-2, 2)
+            ax.set_aspect('equal')
+
+            # Labels
+            if row == 0:
+                ax.set_title(f"CFG = {cfg_val}", fontsize=10, fontweight='bold')
+            if col == 0:
+                ax.set_ylabel(f"Target Class {target_class}", fontsize=10)
+
+            # Clean up axes
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.grid(True, alpha=0.2)
+
+    # Main title
+    fig.suptitle("CFG Comparison: Both Classes", fontsize=12, fontweight='bold')
+    plt.tight_layout()
+
+    if save_path:
+        fig.savefig(save_path, dpi=dpi, bbox_inches='tight')
+        logger.info(f"CFG comparison plot saved to {save_path}")
+
+    plt.close()
+    return fig
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     """Main visualization function for CFG."""
@@ -538,6 +658,20 @@ def main(cfg: DictConfig) -> None:
             dpi=cfg.visualization.get("animation_dpi", 100),
             guidance_scale=float(guidance_scale),
         )
+
+    # Create CFG comparison plot (static 2x6 grid)
+    logger.info("Creating CFG comparison plot...")
+    comparison_cfg_values = cfg.visualization.get("comparison_cfg_values", [0, 1, 3, 5, 7, 9])
+    comparison_figsize = tuple(cfg.visualization.get("comparison_figsize", [18, 6]))
+    plot_cfg_comparison(
+        model=model,
+        dataset=dataset,
+        cfg_values=comparison_cfg_values,
+        n_samples=n_vis_samples,
+        figsize=comparison_figsize,
+        save_path=output_dir / "cfg_comparison_both_classes.png",
+        dpi=cfg.visualization.get("comparison_dpi", 150),
+    )
 
     logger.info("CFG Visualization complete!")
 

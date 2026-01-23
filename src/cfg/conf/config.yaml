@@ -3,6 +3,12 @@
 # Data settings
 data:
   n_samples: 10000
+  # Eye center positions - adjust for overlapping vs non-overlapping
+  # Non-overlapping (default): [-0.5, 0.5] and [0.5, 0.5]
+  # Overlapping: [-0.2, 0.0] and [0.2, 0.0]
+  left_eye_center: [-0.5, 0.5]
+  right_eye_center: [0.5, 0.5]
+  eye_sigma: 0.15
 
 # Model settings (same as base flow model + CFG)
 model:
@@ -36,3 +42,7 @@ visualization:
   trail_length: 10
   density_grid_size: 100
   guidance_scale: 2.0
+  # CFG comparison plot settings
+  comparison_cfg_values: [0, 1, 3, 5, 7, 9]
+  comparison_figsize: [18, 6]  # Same for both overlapping and non-overlapping
+  comparison_dpi: 150

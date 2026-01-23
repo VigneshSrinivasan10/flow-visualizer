@@ -39,3 +39,7 @@ visualization:
   trail_length: 10
   density_grid_size: 100
   guidance_scale: 2.0
+  # CFG comparison plot settings (same as non-overlapping for consistent proportions)
+  comparison_cfg_values: [0, 1, 3, 5, 7, 9]
+  comparison_figsize: [18, 6]
+  comparison_dpi: 150
