@@ -34,20 +34,19 @@ env/
 *~
 
 # Outputs - ignore everything except visualizations in cfg and cfg_overlap
-outputs/
-src/outputs/*
-!src/outputs/cfg/
-src/outputs/cfg/*
-!src/outputs/cfg/visualizations/
-src/outputs/cfg/visualizations/*
-!src/outputs/cfg/visualizations/*.gif
-!src/outputs/cfg/visualizations/*.png
-!src/outputs/cfg_overlap/
-src/outputs/cfg_overlap/*
-!src/outputs/cfg_overlap/visualizations/
-src/outputs/cfg_overlap/visualizations/*
-!src/outputs/cfg_overlap/visualizations/*.gif
-!src/outputs/cfg_overlap/visualizations/*.png
+outputs/*
+!outputs/cfg/
+outputs/cfg/*
+!outputs/cfg/visualizations/
+outputs/cfg/visualizations/*
+!outputs/cfg/visualizations/*.gif
+!outputs/cfg/visualizations/*.png
+!outputs/cfg_overlap/
+outputs/cfg_overlap/*
+!outputs/cfg_overlap/visualizations/
+outputs/cfg_overlap/visualizations/*
+!outputs/cfg_overlap/visualizations/*.gif
+!outputs/cfg_overlap/visualizations/*.png
 *.pt
 *.pth
 *.ckpt

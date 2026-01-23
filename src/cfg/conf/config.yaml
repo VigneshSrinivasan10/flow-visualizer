@@ -26,14 +26,14 @@ training:
   lr_scheduler: linear_decay
   device: cpu
   seed: 42
-  output_dir: outputs/cfg/models
+  output_dir: ../outputs/cfg/models
   log_interval: 10
   class_dropout_prob: 0.1
 
 # Visualization settings
 visualization:
   n_sampling_steps: 100
-  output_dir: outputs/cfg/visualizations
+  output_dir: ../outputs/cfg/visualizations
   grid_size: 20
   animation_fps: 20
   animation_dpi: 100
