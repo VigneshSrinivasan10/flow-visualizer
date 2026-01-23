@@ -15,9 +15,9 @@ from cfg.model import CFGFlowMLP
 
 logger = logging.getLogger(__name__)
 
-# Class colors: left eye (blue), right eye (green), mouth (red)
-CLASS_COLORS = ['#1f77b4', '#2ca02c', '#d62728']
-CLASS_NAMES = ['Left Eye', 'Right Eye', 'Mouth']
+# Class colors: left eye (blue), right eye (red)
+CLASS_COLORS = ['#1f77b4', '#d62728']
+CLASS_NAMES = ['Left Eye', 'Right Eye']
 
 
 class CFGFlowMatchingModel:
@@ -129,7 +129,7 @@ def create_cfg_trajectory_curvature_animation(
             )
         else:
             # Conditional: colored by class
-            for c in range(3):
+            for c in range(2):
                 mask = source_labels == c
                 ax.scatter(
                     all_source_shifted[mask, 0],
@@ -153,7 +153,7 @@ def create_cfg_trajectory_curvature_animation(
             )
         else:
             # Conditional: colored by class
-            for c in range(3):
+            for c in range(2):
                 mask = source_labels == c
                 ax.scatter(
                     all_generated_shifted[mask, 0],
@@ -224,7 +224,7 @@ def create_cfg_trajectory_curvature_animation(
 
         # Add legend (only for conditional models)
         if guidance_scale != 0:
-            for c in range(3):
+            for c in range(2):
                 ax.scatter([], [], color=CLASS_COLORS[c], label=CLASS_NAMES[c], s=50)
             ax.legend(loc='upper right', fontsize=9)
 
@@ -272,20 +272,20 @@ def create_cfg_vector_field_animation(
     all_generated_shifted = all_generated_data.copy()
     all_generated_shifted[:, 0] += x_offset
 
-    # Select 3 representative points per class (9 total), ordered by class
-    # Order: class0_pt0, class0_pt1, class0_pt2, class1_pt0, class1_pt1, class1_pt2, ...
+    # Select 3 representative points per class (6 total), ordered by class
+    # Order: class0_pt0, class0_pt1, class0_pt2, class1_pt0, class1_pt1, class1_pt2
     # Use fixed seed for reproducibility, random selection for visual diversity
     n_points_per_class = 3
     rng = np.random.RandomState(42)
     representative_indices = []
-    for c in range(3):
+    for c in range(2):
         class_indices = np.where(labels_np == c)[0]
         # Randomly pick 3 distinct points from each class
         chosen = rng.choice(class_indices, size=n_points_per_class, replace=False)
         representative_indices.extend(chosen)
     representative_indices = np.array(representative_indices)
     rep_classes = labels_np[representative_indices]
-    n_rep_points = len(representative_indices)  # 9
+    n_rep_points = len(representative_indices)  # 6
 
     # Build full paths for representative points
     rep_paths = []
@@ -297,7 +297,7 @@ def create_cfg_vector_field_animation(
             x_pos = pt[0] + x_offset * (2 * t - 1)
             path.append([x_pos, pt[1]])
         rep_paths.append(np.array(path))
-    rep_paths = np.array(rep_paths)  # Shape: (9, traj_frames, 2)
+    rep_paths = np.array(rep_paths)  # Shape: (6, traj_frames, 2)
 
     # Total frames: 9 points animated sequentially
     n_frames = traj_frames * n_rep_points
@@ -312,7 +312,7 @@ def create_cfg_vector_field_animation(
         ax.clear()
 
         # Determine which point is currently animating and its local frame
-        active_point = frame // traj_frames  # 0 to 8
+        active_point = frame // traj_frames  # 0 to 5
         local_frame = frame % traj_frames
         t = local_frame / (traj_frames - 1)
 
@@ -361,7 +361,7 @@ def create_cfg_vector_field_animation(
         v_cfg_display[:, 0] += shift_velocity
 
         # Plot static Gaussian source on left - colored by class
-        for c in range(3):
+        for c in range(2):
             mask = labels_np == c
             ax.scatter(
                 all_source_shifted[mask, 0],
@@ -373,7 +373,7 @@ def create_cfg_vector_field_animation(
             )
 
         # Plot static generated on right - colored by class
-        for c in range(3):
+        for c in range(2):
             mask = labels_np == c
             ax.scatter(
                 all_generated_shifted[mask, 0],
@@ -472,20 +472,20 @@ def plot_cfg_comparison(
     dataset: FaceDataset,
     cfg_values: list = [0, 1, 3, 5, 7, 9],
     n_samples: int = 2000,
-    figsize: tuple = (18, 9),
+    figsize: tuple = (18, 6),
     save_path: Path = None,
     dpi: int = 150,
 ):
     """
-    Create static 3×6 CFG comparison grid.
+    Create static 2×6 CFG comparison grid.
 
-    Rows: Target Class 0 (left eye), Target Class 1 (right eye), Target Class 2 (mouth)
+    Rows: Target Class 0 (left eye), Target Class 1 (right eye)
     Columns: Different CFG values
     Each panel shows generated samples colored by target class,
     with gray background showing ALL training data.
     """
     n_cols = len(cfg_values)
-    fig, axes = plt.subplots(3, n_cols, figsize=figsize)
+    fig, axes = plt.subplots(2, n_cols, figsize=figsize)
 
     # Get reference data from dataset (for background)
     all_data = dataset.data.numpy()
@@ -493,7 +493,7 @@ def plot_cfg_comparison(
 
     # Get class centers for accuracy calculation
     class_centers = []
-    for c in range(3):
+    for c in range(2):
         mask = all_labels == c
         class_centers.append(all_data[mask].mean(axis=0))
     class_centers = np.array(class_centers)
@@ -501,7 +501,7 @@ def plot_cfg_comparison(
     device = model.device
 
     for col, cfg_val in enumerate(cfg_values):
-        for row, target_class in enumerate([0, 1, 2]):
+        for row, target_class in enumerate([0, 1]):
             ax = axes[row, col]
 
             # Generate samples targeting this class
@@ -539,7 +539,7 @@ def plot_cfg_comparison(
             distances = np.array([
                 np.linalg.norm(generated - center, axis=1)
                 for center in class_centers
-            ])  # Shape: (3, n_samples)
+            ])  # Shape: (2, n_samples)
             closest_class = distances.argmin(axis=0)
             correct = (closest_class == target_class).sum()
             accuracy = 100.0 * correct / n_samples
@@ -617,13 +617,12 @@ def main(cfg: DictConfig) -> None:
 
     # Generate samples for each class
     n_vis_samples = min(2000, cfg.data.n_samples)
-    n_per_class = n_vis_samples // 3
+    n_per_class = n_vis_samples // 2
 
     # Create class labels for visualization
     class_labels = torch.cat([
         torch.zeros(n_per_class, dtype=torch.long),
-        torch.ones(n_per_class, dtype=torch.long),
-        torch.full((n_vis_samples - 2 * n_per_class,), 2, dtype=torch.long),
+        torch.ones(n_vis_samples - n_per_class, dtype=torch.long),
     ]).to(device)
 
     # Move class_labels to CPU for visualization

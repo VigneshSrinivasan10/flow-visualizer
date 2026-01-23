@@ -1,11 +1,11 @@
-"""Dataset generation for CFG flow matching - Face with left eye, right eye, and mouth."""
+"""Dataset generation for CFG flow matching - Two eyes dataset."""
 
 import torch
 from torch.utils.data import Dataset, DataLoader
 
 
 class FaceDataset(Dataset):
-    """Face-shaped dataset with class labels: left eye (0), right eye (1), mouth (2)."""
+    """Two-eyes dataset with class labels: left eye (0), right eye (1)."""
 
     def __init__(
         self,
@@ -14,7 +14,7 @@ class FaceDataset(Dataset):
         right_eye_center: tuple[float, float] = (0.5, 0.5),
         eye_sigma: float = 0.15,
     ):
-        n_per_class = n_samples // 3
+        n_per_class = n_samples // 2
 
         # Left eye (class 0)
         left_eye = torch.randn(n_per_class, 2) * eye_sigma
@@ -23,23 +23,15 @@ class FaceDataset(Dataset):
         left_eye_labels = torch.zeros(n_per_class, dtype=torch.long)
 
         # Right eye (class 1)
-        right_eye = torch.randn(n_per_class, 2) * eye_sigma
+        remaining = n_samples - n_per_class
+        right_eye = torch.randn(remaining, 2) * eye_sigma
         right_eye[:, 0] += right_eye_center[0]
         right_eye[:, 1] += right_eye_center[1]
-        right_eye_labels = torch.ones(n_per_class, dtype=torch.long)
-
-        # Mouth (class 2) - arc at bottom
-        remaining = n_samples - 2 * n_per_class
-        theta = torch.linspace(-0.8 * torch.pi, -0.2 * torch.pi, remaining)
-        mouth_x = 0.6 * torch.cos(theta)
-        mouth_y = 0.6 * torch.sin(theta) - 0.1
-        mouth = torch.stack([mouth_x, mouth_y], dim=1)
-        mouth += torch.randn_like(mouth) * 0.08
-        mouth_labels = torch.full((remaining,), 2, dtype=torch.long)
+        right_eye_labels = torch.ones(remaining, dtype=torch.long)
 
         # Combine all
-        self.data = torch.cat([left_eye, right_eye, mouth], dim=0)
-        self.labels = torch.cat([left_eye_labels, right_eye_labels, mouth_labels], dim=0)
+        self.data = torch.cat([left_eye, right_eye], dim=0)
+        self.labels = torch.cat([left_eye_labels, right_eye_labels], dim=0)
 
         # Shuffle
         perm = torch.randperm(len(self.data))
@@ -57,4 +49,4 @@ class FaceDataset(Dataset):
 
     @property
     def num_classes(self):
-        return 3
+        return 2
