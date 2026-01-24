@@ -415,7 +415,7 @@ def create_probability_path_animation(
             trajectories[target_label][cfg_scale] = traj
 
     # Setup figure: 2 rows (classes), 3 columns (CFG scales)
-    fig, axes = plt.subplots(2, n_cfg, figsize=(4 * n_cfg, 6))
+    fig, axes = plt.subplots(2, n_cfg, figsize=(10, 5))
 
     # Setup KDE grid (wide enough for shifted data: data range 3.5 + offset 2.5 = 6)
     x_grid = np.linspace(-7, 7, grid_size * 2)
@@ -471,7 +471,7 @@ def create_probability_path_animation(
                 ax.scatter(
                     source_shifted[:, 0],
                     source_shifted[:, 1],
-                    alpha=0.8,
+                    alpha=1.0,
                     s=25,
                     color="dodgerblue",
                     edgecolors="none",
@@ -481,7 +481,7 @@ def create_probability_path_animation(
                 ax.scatter(
                     target_shifted[:, 0],
                     target_shifted[:, 1],
-                    alpha=0.8,
+                    alpha=1.0,
                     s=25,
                     color="crimson",
                     edgecolors="none",
@@ -521,7 +521,7 @@ def create_probability_path_animation(
 
                 # CFG and Class labels
                 if row_idx == 0:
-                    ax.text(0, 3.3, f"CFG={cfg_scale}", ha="center", fontsize=11)
+                    ax.set_title(f"CFG={cfg_scale}", fontsize=11)
                 if col_idx == 0:
                     ax.text(-6.5, 0, f"Class {target_label}", ha="center", va="center", fontsize=11, rotation=90)
 
@@ -544,7 +544,7 @@ def create_probability_path_animation(
     logger.info(f"Creating probability path animation with {n_frames} frames ({n_animation_frames} animation + {n_hold_frames} hold)...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
-    plt.tight_layout()
+    plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.05, wspace=0.1, hspace=0.1)
 
     if save_path:
         writer = PillowWriter(fps=fps)
