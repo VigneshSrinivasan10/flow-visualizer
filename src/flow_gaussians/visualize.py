@@ -363,7 +363,8 @@ def plot_both_classes_cfg(
 
 def create_probability_path_animation(
     model: SimpleFlowNetwork,
-    target_label: int,
+    data: np.ndarray,
+    labels: np.ndarray,
     cfg_scales: List[float] = None,
     n_samples: int = 500,
     num_steps: int = 50,
@@ -376,13 +377,14 @@ def create_probability_path_animation(
     """
     Create animated probability path visualization showing density flow from source to target.
 
-    Creates a 3x1 grid (3 rows, 1 column) where each row shows a different CFG scale.
+    Creates a 2x3 grid (2 rows for classes, 3 columns for CFG scales).
     Each subplot shows source distribution on left, target on right, with density
-    flowing between them over time.
+    flowing between them over time. Training data is shown in background.
 
     Args:
         model: Trained SimpleFlowNetwork
-        target_label: Target class label (0 or 1)
+        data: Training data (n_samples, 2)
+        labels: Training labels (n_samples,)
         cfg_scales: List of CFG scales to visualize (default: [1, 5, 9])
         n_samples: Number of samples for trajectory
         num_steps: Number of Euler steps (frames in animation)
@@ -396,117 +398,137 @@ def create_probability_path_animation(
         cfg_scales = [1, 5, 9]
 
     n_cfg = len(cfg_scales)
-    x_offset = 2.5
+    x_offset = 3.5
+    target_labels = [0, 1]
 
-    # Generate trajectories for each CFG scale
+    # Generate trajectories for each class and CFG scale
     logger.info(f"Generating trajectories for CFG scales {cfg_scales}...")
     trajectories = {}
-    for cfg_scale in cfg_scales:
-        traj = sample_euler_full_trajectory(
-            model, n_samples, target_label, num_steps=num_steps, cfg_scale=cfg_scale, seed=seed
-        )
-        trajectories[cfg_scale] = traj
+    for target_label in target_labels:
+        trajectories[target_label] = {}
+        for cfg_scale in cfg_scales:
+            traj = sample_euler_full_trajectory(
+                model, n_samples, target_label, num_steps=num_steps, cfg_scale=cfg_scale, seed=seed
+            )
+            trajectories[target_label][cfg_scale] = traj
 
-    # Setup figure: 3 rows, 1 column
-    fig, axes = plt.subplots(n_cfg, 1, figsize=(10, 3 * n_cfg))
-    if n_cfg == 1:
-        axes = [axes]
+    # Setup figure: 2 rows (classes), 3 columns (CFG scales)
+    fig, axes = plt.subplots(2, n_cfg, figsize=(4 * n_cfg, 6))
 
-    # Setup KDE grid
-    x_grid = np.linspace(-4.5, 4.5, grid_size * 2)
-    y_grid = np.linspace(-2.5, 2.5, grid_size)
+    # Setup KDE grid (wide enough for shifted data: data range 3.5 + offset 2.5 = 6)
+    x_grid = np.linspace(-7, 7, grid_size * 2)
+    y_grid = np.linspace(-3.5, 3.5, grid_size)
     X, Y = np.meshgrid(x_grid, y_grid)
     positions = np.vstack([X.ravel(), Y.ravel()])
 
     # Get source and target for static display
-    sources = {cfg: trajectories[cfg][0] for cfg in cfg_scales}
-    targets = {cfg: trajectories[cfg][-1] for cfg in cfg_scales}
+    sources = {}
+    targets = {}
+    for target_label in target_labels:
+        sources[target_label] = {cfg: trajectories[target_label][cfg][0] for cfg in cfg_scales}
+        targets[target_label] = {cfg: trajectories[target_label][cfg][-1] for cfg in cfg_scales}
+
+    # Training data masks
+    mask_0 = labels == 0
+    mask_1 = labels == 1
 
     n_frames = num_steps + 1
 
     def update(frame_idx):
         t = frame_idx / num_steps
 
-        for ax_idx, cfg_scale in enumerate(cfg_scales):
-            ax = axes[ax_idx]
-            ax.clear()
+        for row_idx, target_label in enumerate(target_labels):
+            for col_idx, cfg_scale in enumerate(cfg_scales):
+                ax = axes[row_idx, col_idx]
+                ax.clear()
 
-            # Get current samples
-            current_samples = trajectories[cfg_scale][frame_idx].copy()
+                # Get current samples
+                current_samples = trajectories[target_label][cfg_scale][frame_idx].copy()
 
-            # Source distribution (shifted left)
-            source_shifted = sources[cfg_scale].copy()
-            source_shifted[:, 0] -= x_offset
+                # Plot training data (faded, shifted)
+                train_data_left = data.copy()
+                train_data_left[:, 0] -= x_offset
+                train_data_right = data.copy()
+                train_data_right[:, 0] += x_offset
 
-            # Target distribution (shifted right)
-            target_shifted = targets[cfg_scale].copy()
-            target_shifted[:, 0] += x_offset
+                ax.scatter(train_data_left[mask_0, 0], train_data_left[mask_0, 1], c="gray", alpha=0.1, s=3)
+                ax.scatter(train_data_left[mask_1, 0], train_data_left[mask_1, 1], c="lightcoral", alpha=0.1, s=3)
+                ax.scatter(train_data_right[mask_0, 0], train_data_right[mask_0, 1], c="gray", alpha=0.1, s=3)
+                ax.scatter(train_data_right[mask_1, 0], train_data_right[mask_1, 1], c="lightcoral", alpha=0.1, s=3)
 
-            # Plot static source (blue)
-            ax.scatter(
-                source_shifted[:, 0],
-                source_shifted[:, 1],
-                alpha=0.3,
-                s=10,
-                color="dodgerblue",
-                edgecolors="none",
-            )
+                # Source distribution (shifted left)
+                source_shifted = sources[target_label][cfg_scale].copy()
+                source_shifted[:, 0] -= x_offset
 
-            # Plot static target (red)
-            ax.scatter(
-                target_shifted[:, 0],
-                target_shifted[:, 1],
-                alpha=0.3,
-                s=10,
-                color="crimson",
-                edgecolors="none",
-            )
+                # Target distribution (shifted right)
+                target_shifted = targets[target_label][cfg_scale].copy()
+                target_shifted[:, 0] += x_offset
 
-            # Current samples shifted based on time (flow from left to right)
-            data_shifted = current_samples.copy()
-            data_shifted[:, 0] += x_offset * (2 * t - 1)
-
-            # KDE density visualization
-            try:
-                kde = gaussian_kde(data_shifted.T, bw_method=0.15)
-                Z = kde(positions).reshape(grid_size, grid_size * 2)
-
-                levels = np.linspace(0, Z.max() * 0.95, 15)
-                if Z.max() > 0:
-                    ax.contourf(X, Y, Z, levels=levels, cmap="Blues", alpha=0.9)
-                    ax.contour(X, Y, Z, levels=levels[::2], colors="darkblue", alpha=0.3, linewidths=0.5)
-            except (np.linalg.LinAlgError, ValueError):
-                # Fallback to scatter if KDE fails
+                # Plot static source (blue)
                 ax.scatter(
-                    data_shifted[:, 0],
-                    data_shifted[:, 1],
-                    alpha=0.5,
-                    s=15,
-                    color="steelblue",
+                    source_shifted[:, 0],
+                    source_shifted[:, 1],
+                    alpha=0.3,
+                    s=8,
+                    color="dodgerblue",
                     edgecolors="none",
                 )
 
-            # Labels for source/target
-            ax.text(-x_offset, 2.0, "Source", ha="center", fontsize=10, color="gray", fontweight="bold")
-            ax.text(x_offset, 2.0, "Target", ha="center", fontsize=10, color="gray", fontweight="bold")
+                # Plot static target (red)
+                ax.scatter(
+                    target_shifted[:, 0],
+                    target_shifted[:, 1],
+                    alpha=0.3,
+                    s=8,
+                    color="crimson",
+                    edgecolors="none",
+                )
 
-            # CFG label on left
-            ax.text(-4.2, 0, f"CFG={cfg_scale}", ha="center", va="center", fontsize=11, fontweight="bold", rotation=90)
+                # Current samples shifted based on time (flow from left to right)
+                data_shifted = current_samples.copy()
+                data_shifted[:, 0] += x_offset * (2 * t - 1)
 
-            # Time slider
-            slider_y = -2.2
-            ax.plot([-3.5, 3.5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
-            slider_x = -3.5 + 7.0 * t
-            ax.scatter([slider_x], [slider_y], s=80, color="black", zorder=20)
-            ax.text(-3.5, slider_y - 0.25, "t=0", ha="center", fontsize=8)
-            ax.text(3.5, slider_y - 0.25, "t=1", ha="center", fontsize=8)
+                # KDE density visualization
+                try:
+                    kde = gaussian_kde(data_shifted.T, bw_method=0.15)
+                    Z = kde(positions).reshape(grid_size, grid_size * 2)
 
-            ax.set_xlim(-4.5, 4.5)
-            ax.set_ylim(-2.7, 2.5)
-            ax.set_aspect("equal")
-            ax.axis("off")
+                    levels = np.linspace(0, Z.max() * 0.95, 15)
+                    if Z.max() > 0:
+                        ax.contourf(X, Y, Z, levels=levels, cmap="Blues", alpha=0.9)
+                        ax.contour(X, Y, Z, levels=levels[::2], colors="darkblue", alpha=0.3, linewidths=0.5)
+                except (np.linalg.LinAlgError, ValueError):
+                    # Fallback to scatter if KDE fails
+                    ax.scatter(
+                        data_shifted[:, 0],
+                        data_shifted[:, 1],
+                        alpha=0.5,
+                        s=10,
+                        color="steelblue",
+                        edgecolors="none",
+                    )
 
-        return axes
+                # Labels
+                if row_idx == 0:
+                    ax.text(0, 3.0, f"CFG={cfg_scale}", ha="center", fontsize=11)
+                if col_idx == 0:
+                    ax.text(-6.5, 0, f"Class {target_label}", ha="center", va="center", fontsize=11, rotation=90)
+
+                # Time slider (only on bottom row)
+                if row_idx == 1:
+                    slider_y = -3.0
+                    ax.plot([-5, 5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
+                    slider_x = -5 + 10.0 * t
+                    ax.scatter([slider_x], [slider_y], s=60, color="black", zorder=20)
+                    ax.text(-5, slider_y - 0.4, "t=0", ha="center", fontsize=7)
+                    ax.text(5, slider_y - 0.4, "t=1", ha="center", fontsize=7)
+
+                ax.set_xlim(-7, 7)
+                ax.set_ylim(-3.5, 3.5)
+                ax.set_aspect("equal")
+                ax.axis("off")
+
+        return axes.flatten()
 
     logger.info(f"Creating probability path animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
@@ -640,16 +662,16 @@ def main(cfg: DictConfig) -> None:
     anim_num_steps = cfg.visualization.get("animation_num_steps", 50)
     anim_fps = cfg.visualization.get("animation_fps", 20)
 
-    for target_label in [0, 1]:
-        create_probability_path_animation(
-            model,
-            target_label=target_label,
-            cfg_scales=anim_cfg_scales,
-            n_samples=anim_n_samples,
-            num_steps=anim_num_steps,
-            save_path=str(viz_dir / f"probability_path_class{target_label}.gif"),
-            fps=anim_fps,
-        )
+    create_probability_path_animation(
+        model,
+        data,
+        labels,
+        cfg_scales=anim_cfg_scales,
+        n_samples=anim_n_samples,
+        num_steps=anim_num_steps,
+        save_path=str(viz_dir / "probability_path.gif"),
+        fps=anim_fps,
+    )
 
     logger.info(f"All visualizations saved to {viz_dir}")
 
