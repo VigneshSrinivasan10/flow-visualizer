@@ -120,6 +120,52 @@ def sample_euler_with_trajectory(
     return x, trajectories
 
 
+def sample_euler_full_trajectory(
+    model: SimpleFlowNetwork,
+    n_samples: int,
+    label: int,
+    num_steps: int = 100,
+    cfg_scale: float = 0.0,
+    seed: int | None = None,
+) -> List[np.ndarray]:
+    """
+    Sample with full trajectory tracking at every step.
+
+    Args:
+        model: Trained SimpleFlowNetwork
+        n_samples: Number of samples to generate
+        label: Target class label (0 or 1)
+        num_steps: Number of Euler steps
+        cfg_scale: CFG strength
+        seed: Random seed for reproducibility
+
+    Returns:
+        trajectory: List of (n_samples, 2) arrays, one per step [x_0, x_1, ..., x_T]
+    """
+    if seed is not None:
+        np.random.seed(seed)
+
+    x = np.random.randn(n_samples, 2)
+    dt = 1.0 / num_steps
+
+    labels_cond = np.full(n_samples, label, dtype=float)
+    labels_uncond = np.full(n_samples, -1, dtype=float)
+
+    trajectory = [x.copy()]
+
+    for step in range(num_steps):
+        t = np.full((n_samples, 1), step * dt)
+
+        v_cond = model.predict(x, t, labels_cond)
+        v_uncond = model.predict(x, t, labels_uncond)
+        v = v_uncond + cfg_scale * (v_cond - v_uncond)
+
+        x = x + v * dt
+        trajectory.append(x.copy())
+
+    return trajectory
+
+
 def classify_samples(
     samples: np.ndarray,
     class0_centers: List[List[float]] | None = None,

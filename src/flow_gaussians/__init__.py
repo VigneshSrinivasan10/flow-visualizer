@@ -14,7 +14,7 @@ from flow_gaussians.data import (
     generate_overlapping_gaussians,
 )
 from flow_gaussians.model import AdamOptimizer, SimpleFlowNetwork
-from flow_gaussians.sampling import sample_euler, sample_euler_with_trajectory
+from flow_gaussians.sampling import sample_euler, sample_euler_full_trajectory, sample_euler_with_trajectory
 from flow_gaussians.train import train_flow_matching
 
 __all__ = [
@@ -30,5 +30,6 @@ __all__ = [
     "train_flow_matching",
     # Sampling
     "sample_euler",
+    "sample_euler_full_trajectory",
     "sample_euler_with_trajectory",
 ]

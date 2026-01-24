@@ -8,13 +8,16 @@ from typing import List, Optional, Tuple
 import hydra
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.animation import FuncAnimation, PillowWriter
 from omegaconf import DictConfig, OmegaConf
+from scipy.stats import gaussian_kde
 
 from flow_gaussians.data import DATASET_CONFIGS
 from flow_gaussians.model import SimpleFlowNetwork
 from flow_gaussians.sampling import (
     classify_samples,
     sample_euler,
+    sample_euler_full_trajectory,
     sample_euler_with_trajectory,
 )
 
@@ -358,6 +361,166 @@ def plot_both_classes_cfg(
     return fig
 
 
+def create_probability_path_animation(
+    model: SimpleFlowNetwork,
+    target_label: int,
+    cfg_scales: List[float] = None,
+    n_samples: int = 500,
+    num_steps: int = 50,
+    save_path: Optional[str] = None,
+    fps: int = 20,
+    dpi: int = 100,
+    grid_size: int = 80,
+    seed: int = 42,
+):
+    """
+    Create animated probability path visualization showing density flow from source to target.
+
+    Creates a 3x1 grid (3 rows, 1 column) where each row shows a different CFG scale.
+    Each subplot shows source distribution on left, target on right, with density
+    flowing between them over time.
+
+    Args:
+        model: Trained SimpleFlowNetwork
+        target_label: Target class label (0 or 1)
+        cfg_scales: List of CFG scales to visualize (default: [1, 5, 9])
+        n_samples: Number of samples for trajectory
+        num_steps: Number of Euler steps (frames in animation)
+        save_path: Path to save the GIF
+        fps: Frames per second
+        dpi: Output resolution
+        grid_size: Resolution for KDE grid
+        seed: Random seed for reproducibility
+    """
+    if cfg_scales is None:
+        cfg_scales = [1, 5, 9]
+
+    n_cfg = len(cfg_scales)
+    x_offset = 2.5
+
+    # Generate trajectories for each CFG scale
+    logger.info(f"Generating trajectories for CFG scales {cfg_scales}...")
+    trajectories = {}
+    for cfg_scale in cfg_scales:
+        traj = sample_euler_full_trajectory(
+            model, n_samples, target_label, num_steps=num_steps, cfg_scale=cfg_scale, seed=seed
+        )
+        trajectories[cfg_scale] = traj
+
+    # Setup figure: 3 rows, 1 column
+    fig, axes = plt.subplots(n_cfg, 1, figsize=(10, 3 * n_cfg))
+    if n_cfg == 1:
+        axes = [axes]
+
+    # Setup KDE grid
+    x_grid = np.linspace(-4.5, 4.5, grid_size * 2)
+    y_grid = np.linspace(-2.5, 2.5, grid_size)
+    X, Y = np.meshgrid(x_grid, y_grid)
+    positions = np.vstack([X.ravel(), Y.ravel()])
+
+    # Get source and target for static display
+    sources = {cfg: trajectories[cfg][0] for cfg in cfg_scales}
+    targets = {cfg: trajectories[cfg][-1] for cfg in cfg_scales}
+
+    n_frames = num_steps + 1
+
+    def update(frame_idx):
+        t = frame_idx / num_steps
+
+        for ax_idx, cfg_scale in enumerate(cfg_scales):
+            ax = axes[ax_idx]
+            ax.clear()
+
+            # Get current samples
+            current_samples = trajectories[cfg_scale][frame_idx].copy()
+
+            # Source distribution (shifted left)
+            source_shifted = sources[cfg_scale].copy()
+            source_shifted[:, 0] -= x_offset
+
+            # Target distribution (shifted right)
+            target_shifted = targets[cfg_scale].copy()
+            target_shifted[:, 0] += x_offset
+
+            # Plot static source (blue)
+            ax.scatter(
+                source_shifted[:, 0],
+                source_shifted[:, 1],
+                alpha=0.3,
+                s=10,
+                color="dodgerblue",
+                edgecolors="none",
+            )
+
+            # Plot static target (red)
+            ax.scatter(
+                target_shifted[:, 0],
+                target_shifted[:, 1],
+                alpha=0.3,
+                s=10,
+                color="crimson",
+                edgecolors="none",
+            )
+
+            # Current samples shifted based on time (flow from left to right)
+            data_shifted = current_samples.copy()
+            data_shifted[:, 0] += x_offset * (2 * t - 1)
+
+            # KDE density visualization
+            try:
+                kde = gaussian_kde(data_shifted.T, bw_method=0.15)
+                Z = kde(positions).reshape(grid_size, grid_size * 2)
+
+                levels = np.linspace(0, Z.max() * 0.95, 15)
+                if Z.max() > 0:
+                    ax.contourf(X, Y, Z, levels=levels, cmap="Blues", alpha=0.9)
+                    ax.contour(X, Y, Z, levels=levels[::2], colors="darkblue", alpha=0.3, linewidths=0.5)
+            except (np.linalg.LinAlgError, ValueError):
+                # Fallback to scatter if KDE fails
+                ax.scatter(
+                    data_shifted[:, 0],
+                    data_shifted[:, 1],
+                    alpha=0.5,
+                    s=15,
+                    color="steelblue",
+                    edgecolors="none",
+                )
+
+            # Labels for source/target
+            ax.text(-x_offset, 2.0, "Source", ha="center", fontsize=10, color="gray", fontweight="bold")
+            ax.text(x_offset, 2.0, "Target", ha="center", fontsize=10, color="gray", fontweight="bold")
+
+            # CFG label on left
+            ax.text(-4.2, 0, f"CFG={cfg_scale}", ha="center", va="center", fontsize=11, fontweight="bold", rotation=90)
+
+            # Time slider
+            slider_y = -2.2
+            ax.plot([-3.5, 3.5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
+            slider_x = -3.5 + 7.0 * t
+            ax.scatter([slider_x], [slider_y], s=80, color="black", zorder=20)
+            ax.text(-3.5, slider_y - 0.25, "t=0", ha="center", fontsize=8)
+            ax.text(3.5, slider_y - 0.25, "t=1", ha="center", fontsize=8)
+
+            ax.set_xlim(-4.5, 4.5)
+            ax.set_ylim(-2.7, 2.5)
+            ax.set_aspect("equal")
+            ax.axis("off")
+
+        return axes
+
+    logger.info(f"Creating probability path animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    plt.tight_layout()
+
+    if save_path:
+        writer = PillowWriter(fps=fps)
+        anim.save(save_path, writer=writer, dpi=dpi)
+        logger.info(f"Saved: {save_path}")
+
+    plt.close(fig)
+
+
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig) -> None:
     """Main visualization function."""
@@ -468,6 +631,24 @@ def main(cfg: DictConfig) -> None:
             save_path=str(viz_dir / f"flow_evolution_class{target_label}.png"),
             xlim=(-3.5, 3.5),
             ylim=(-3.5, 3.5),
+        )
+
+    # Probability path animation
+    logger.info("Creating probability path animation...")
+    anim_cfg_scales = list(cfg.visualization.get("animation_cfg_scales", [1, 5, 9]))
+    anim_n_samples = cfg.visualization.get("animation_n_samples", 500)
+    anim_num_steps = cfg.visualization.get("animation_num_steps", 50)
+    anim_fps = cfg.visualization.get("animation_fps", 20)
+
+    for target_label in [0, 1]:
+        create_probability_path_animation(
+            model,
+            target_label=target_label,
+            cfg_scales=anim_cfg_scales,
+            n_samples=anim_n_samples,
+            num_steps=anim_num_steps,
+            save_path=str(viz_dir / f"probability_path_class{target_label}.gif"),
+            fps=anim_fps,
         )
 
     logger.info(f"All visualizations saved to {viz_dir}")
