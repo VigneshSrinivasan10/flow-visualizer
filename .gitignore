@@ -33,7 +33,7 @@ env/
 *.swo
 *~
 
-# Outputs - ignore everything except visualizations in cfg and cfg_overlap
+# Outputs - ignore everything except visualizations
 outputs/*
 !outputs/cfg/
 outputs/cfg/*
@@ -47,6 +47,14 @@ outputs/cfg_overlap/*
 outputs/cfg_overlap/visualizations/*
 !outputs/cfg_overlap/visualizations/*.gif
 !outputs/cfg_overlap/visualizations/*.png
+!outputs/flow_gaussians/
+outputs/flow_gaussians/*
+!outputs/flow_gaussians/*/
+outputs/flow_gaussians/*/*
+!outputs/flow_gaussians/*/visualizations/
+outputs/flow_gaussians/*/visualizations/*
+!outputs/flow_gaussians/*/visualizations/*.gif
+!outputs/flow_gaussians/*/visualizations/*.png
 *.pt
 *.pth
 *.ckpt
