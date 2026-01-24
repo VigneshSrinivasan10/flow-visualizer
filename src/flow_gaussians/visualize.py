@@ -471,8 +471,8 @@ def create_probability_path_animation(
                 ax.scatter(
                     source_shifted[:, 0],
                     source_shifted[:, 1],
-                    alpha=0.5,
-                    s=15,
+                    alpha=0.8,
+                    s=25,
                     color="dodgerblue",
                     edgecolors="none",
                 )
@@ -481,8 +481,8 @@ def create_probability_path_animation(
                 ax.scatter(
                     target_shifted[:, 0],
                     target_shifted[:, 1],
-                    alpha=0.3,
-                    s=8,
+                    alpha=0.8,
+                    s=25,
                     color="crimson",
                     edgecolors="none",
                 )
@@ -512,8 +512,12 @@ def create_probability_path_animation(
                     )
 
                 # Source and Target labels (top of each subplot)
-                ax.text(-x_offset, 3.0, "Source", ha="center", fontsize=10, fontweight="bold", color="dodgerblue")
-                ax.text(x_offset, 3.0, "Target", ha="center", fontsize=10, fontweight="bold", color="crimson")
+                ax.text(-x_offset, 3.2, "Source distribution", ha="center", fontsize=9,
+                        fontweight="bold", color="dodgerblue",
+                        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
+                ax.text(x_offset, 3.2, "Target distribution", ha="center", fontsize=9,
+                        fontweight="bold", color="crimson",
+                        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
 
                 # CFG and Class labels
                 if row_idx == 0:
