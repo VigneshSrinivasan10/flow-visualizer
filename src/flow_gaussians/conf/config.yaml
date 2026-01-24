@@ -1,0 +1,25 @@
+# Flow Matching on 2D Gaussians with Classifier-Free Guidance
+# Default configuration
+
+data:
+  # Dataset type: overlapping, non_overlapping, multimodal
+  dataset: overlapping
+  n_samples: 5000
+
+model:
+  hidden_dim: 128
+
+training:
+  seed: 42
+  epochs: 500
+  batch_size: 128
+  learning_rate: 0.0005
+  label_dropout: 0.3
+  log_interval: 50
+  force_retrain: false
+  output_dir: outputs/flow_gaussians/${data.dataset}
+
+visualization:
+  n_samples: 500
+  cfg_scales: [0, 1, 3, 5, 7, 9]
+  evolution_cfg_scales: [0, 1, 2, 4, 6, 8, 10]

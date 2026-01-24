@@ -1,0 +1,11 @@
+# Flow Matching on Multimodal Non-Overlapping 2D Gaussians
+# Each class has 3 separate clusters
+
+defaults:
+  - config
+
+data:
+  dataset: multimodal
+
+training:
+  output_dir: outputs/flow_gaussians/multimodal

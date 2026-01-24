@@ -1,0 +1,11 @@
+# Flow Matching on Non-Overlapping 2D Gaussians
+# Classes are far apart with minimal overlap
+
+defaults:
+  - config
+
+data:
+  dataset: non_overlapping
+
+training:
+  output_dir: outputs/flow_gaussians/non_overlapping

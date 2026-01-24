@@ -27,6 +27,8 @@ rf-train = "rectified_flow.train:main"
 rf-visualize = "rectified_flow.visualize:main"
 am-train = "adjoint_matching.train:main"
 am-visualize = "adjoint_matching.visualize:main"
+fg-train = "flow_gaussians.train:main"
+fg-visualize = "flow_gaussians.visualize:main"
 
 [tool.uv]
 package = true
