@@ -369,17 +369,18 @@ def create_probability_path_animation(
     n_samples: int = 500,
     num_steps: int = 50,
     save_path: Optional[str] = None,
-    fps: int = 20,
+    fps: int = 15,
     dpi: int = 100,
     grid_size: int = 80,
     seed: int = 42,
+    hold_end_seconds: float = 3.0,
 ):
     """
     Create animated probability path visualization showing density flow from source to target.
 
     Creates a 2x3 grid (2 rows for classes, 3 columns for CFG scales).
     Each subplot shows source distribution on left, target on right, with density
-    flowing between them over time. Training data is shown in background.
+    flowing between them over time. Training data is shown on target side only.
 
     Args:
         model: Trained SimpleFlowNetwork
@@ -389,10 +390,11 @@ def create_probability_path_animation(
         n_samples: Number of samples for trajectory
         num_steps: Number of Euler steps (frames in animation)
         save_path: Path to save the GIF
-        fps: Frames per second
+        fps: Frames per second (default: 15 for slower animation)
         dpi: Output resolution
         grid_size: Resolution for KDE grid
         seed: Random seed for reproducibility
+        hold_end_seconds: How long to hold the final frame (default: 3 seconds)
     """
     if cfg_scales is None:
         cfg_scales = [1, 5, 9]
@@ -432,10 +434,15 @@ def create_probability_path_animation(
     mask_0 = labels == 0
     mask_1 = labels == 1
 
-    n_frames = num_steps + 1
+    # Calculate frames: main animation + hold frames at end
+    n_animation_frames = num_steps + 1
+    n_hold_frames = int(hold_end_seconds * fps)
+    n_frames = n_animation_frames + n_hold_frames
 
     def update(frame_idx):
-        t = frame_idx / num_steps
+        # Clamp to final frame during hold period
+        actual_frame = min(frame_idx, num_steps)
+        t = actual_frame / num_steps
 
         for row_idx, target_label in enumerate(target_labels):
             for col_idx, cfg_scale in enumerate(cfg_scales):
@@ -443,16 +450,12 @@ def create_probability_path_animation(
                 ax.clear()
 
                 # Get current samples
-                current_samples = trajectories[target_label][cfg_scale][frame_idx].copy()
+                current_samples = trajectories[target_label][cfg_scale][actual_frame].copy()
 
-                # Plot training data (faded, shifted)
-                train_data_left = data.copy()
-                train_data_left[:, 0] -= x_offset
+                # Plot training data (faded, shifted) - only on target (right) side
                 train_data_right = data.copy()
                 train_data_right[:, 0] += x_offset
 
-                ax.scatter(train_data_left[mask_0, 0], train_data_left[mask_0, 1], c="gray", alpha=0.1, s=3)
-                ax.scatter(train_data_left[mask_1, 0], train_data_left[mask_1, 1], c="lightcoral", alpha=0.1, s=3)
                 ax.scatter(train_data_right[mask_0, 0], train_data_right[mask_0, 1], c="gray", alpha=0.1, s=3)
                 ax.scatter(train_data_right[mask_1, 0], train_data_right[mask_1, 1], c="lightcoral", alpha=0.1, s=3)
 
@@ -464,12 +467,12 @@ def create_probability_path_animation(
                 target_shifted = targets[target_label][cfg_scale].copy()
                 target_shifted[:, 0] += x_offset
 
-                # Plot static source (blue)
+                # Plot static source (blue) - more visible
                 ax.scatter(
                     source_shifted[:, 0],
                     source_shifted[:, 1],
-                    alpha=0.3,
-                    s=8,
+                    alpha=0.5,
+                    s=15,
                     color="dodgerblue",
                     edgecolors="none",
                 )
@@ -508,9 +511,13 @@ def create_probability_path_animation(
                         edgecolors="none",
                     )
 
-                # Labels
+                # Source and Target labels (top of each subplot)
+                ax.text(-x_offset, 3.0, "Source", ha="center", fontsize=10, fontweight="bold", color="dodgerblue")
+                ax.text(x_offset, 3.0, "Target", ha="center", fontsize=10, fontweight="bold", color="crimson")
+
+                # CFG and Class labels
                 if row_idx == 0:
-                    ax.text(0, 3.0, f"CFG={cfg_scale}", ha="center", fontsize=11)
+                    ax.text(0, 3.3, f"CFG={cfg_scale}", ha="center", fontsize=11)
                 if col_idx == 0:
                     ax.text(-6.5, 0, f"Class {target_label}", ha="center", va="center", fontsize=11, rotation=90)
 
@@ -530,7 +537,7 @@ def create_probability_path_animation(
 
         return axes.flatten()
 
-    logger.info(f"Creating probability path animation with {n_frames} frames...")
+    logger.info(f"Creating probability path animation with {n_frames} frames ({n_animation_frames} animation + {n_hold_frames} hold)...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
     plt.tight_layout()
@@ -660,7 +667,7 @@ def main(cfg: DictConfig) -> None:
     anim_cfg_scales = list(cfg.visualization.get("animation_cfg_scales", [1, 5, 9]))
     anim_n_samples = cfg.visualization.get("animation_n_samples", 500)
     anim_num_steps = cfg.visualization.get("animation_num_steps", 50)
-    anim_fps = cfg.visualization.get("animation_fps", 20)
+    anim_fps = cfg.visualization.get("animation_fps", 15)
 
     create_probability_path_animation(
         model,

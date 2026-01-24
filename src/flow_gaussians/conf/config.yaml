@@ -26,4 +26,4 @@ visualization:
   animation_cfg_scales: [1, 5, 9]
   animation_n_samples: 500
   animation_num_steps: 50
-  animation_fps: 20
+  animation_fps: 15
