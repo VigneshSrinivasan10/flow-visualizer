@@ -18,6 +18,8 @@ from flow_gaussians.sampling import (
     classify_samples,
     sample_euler,
     sample_euler_full_trajectory,
+    sample_euler_rectified_cfg_plusplus,
+    sample_euler_rectified_cfg_plusplus_full_trajectory,
     sample_euler_with_trajectory,
 )
 
@@ -545,6 +547,406 @@ def create_probability_path_animation(
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
     plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.05, wspace=0.1, hspace=0.1)
+
+    if save_path:
+        writer = PillowWriter(fps=fps)
+        anim.save(save_path, writer=writer, dpi=dpi)
+        logger.info(f"Saved: {save_path}")
+
+    plt.close(fig)
+
+
+def plot_cfg_vs_rectified_comparison(
+    model: SimpleFlowNetwork,
+    data: np.ndarray,
+    labels: np.ndarray,
+    cfg_scales: Optional[List[float]] = None,
+    lambda_maxs: Optional[List[float]] = None,
+    n_samples: int = 500,
+    save_path: Optional[str] = None,
+    class0_centers: Optional[List[List[float]]] = None,
+    class1_centers: Optional[List[List[float]]] = None,
+    xlim: Tuple[float, float] = (-3, 3),
+    ylim: Tuple[float, float] = (-3, 3),
+    seed: int = 123,
+    gamma: float = 1.0,
+):
+    """
+    Compare Standard CFG vs Rectified CFG++ side by side.
+
+    Creates a grid with:
+    - 2 rows: Class 0, Class 1
+    - n columns: different guidance scales
+    - Top half: Standard CFG
+    - Bottom half: Rectified CFG++
+    """
+    if cfg_scales is None:
+        cfg_scales = [1, 3, 5, 7]
+    if lambda_maxs is None:
+        lambda_maxs = cfg_scales  # Use same values for comparison
+
+    n_cols = len(cfg_scales)
+    fig, axes = plt.subplots(4, n_cols, figsize=(4 * n_cols, 14))
+
+    mask_0 = labels == 0
+    mask_1 = labels == 1
+
+    methods = [
+        ("Standard CFG", sample_euler, "cfg_scale"),
+        ("Rectified CFG++", sample_euler_rectified_cfg_plusplus, "lambda_max"),
+    ]
+
+    for method_idx, (method_name, sample_fn, param_name) in enumerate(methods):
+        scales = cfg_scales if method_name == "Standard CFG" else lambda_maxs
+
+        for target_label in [0, 1]:
+            row_idx = method_idx * 2 + target_label
+
+            for col_idx, scale in enumerate(scales):
+                ax = axes[row_idx, col_idx]
+
+                # Generate samples
+                kwargs = {
+                    "model": model,
+                    "n_samples": n_samples,
+                    "label": target_label,
+                    "num_steps": 100,
+                    "seed": seed + target_label,
+                }
+                kwargs[param_name] = scale
+                if method_name == "Rectified CFG++":
+                    kwargs["gamma"] = gamma
+
+                samples = sample_fn(**kwargs)
+
+                # Plot training data (faded)
+                ax.scatter(data[mask_0, 0], data[mask_0, 1], c="gray", alpha=0.15, s=5)
+                ax.scatter(data[mask_1, 0], data[mask_1, 1], c="lightcoral", alpha=0.15, s=5)
+
+                # Color samples by target class
+                color = "#3498db" if target_label == 0 else "#e74c3c"
+                ax.scatter(
+                    samples[:, 0],
+                    samples[:, 1],
+                    c=color,
+                    edgecolors="black",
+                    linewidths=0.5,
+                    alpha=0.7,
+                    s=30,
+                )
+
+                # Compute accuracy
+                predicted = classify_samples(samples, class0_centers, class1_centers)
+                target_count = np.sum(predicted == target_label)
+                accuracy = target_count / n_samples
+
+                # Stats box
+                box_color = "#90EE90" if accuracy >= 0.9 else ("#FFFF99" if accuracy >= 0.7 else "#FFB6C1")
+                ax.text(
+                    0.02, 0.98, f"Acc: {accuracy:.1%}",
+                    transform=ax.transAxes, fontsize=9, verticalalignment="top",
+                    bbox=dict(boxstyle="round", facecolor=box_color, alpha=0.8),
+                )
+
+                ax.set_xlim(xlim)
+                ax.set_ylim(ylim)
+                ax.set_aspect("equal")
+                ax.grid(True, alpha=0.3)
+
+                # Labels
+                if row_idx == 0:
+                    ax.set_title(f"Scale = {scale}", fontsize=12, fontweight="bold")
+                if col_idx == 0:
+                    label_text = f"{method_name}\nClass {target_label}"
+                    ax.set_ylabel(label_text, fontsize=10, fontweight="bold")
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        logger.info(f"Saved: {save_path}")
+
+    plt.close(fig)
+    return fig
+
+
+def create_rectified_cfg_probability_path_animation(
+    model: SimpleFlowNetwork,
+    data: np.ndarray,
+    labels: np.ndarray,
+    lambda_maxs: List[float] = None,
+    n_samples: int = 500,
+    num_steps: int = 50,
+    save_path: Optional[str] = None,
+    fps: int = 15,
+    dpi: int = 100,
+    grid_size: int = 80,
+    seed: int = 42,
+    gamma: float = 1.0,
+    hold_end_seconds: float = 3.0,
+):
+    """
+    Create animated probability path visualization for Rectified CFG++.
+
+    Similar to create_probability_path_animation but uses the predictor-corrector scheme.
+    """
+    if lambda_maxs is None:
+        lambda_maxs = [1, 5, 9]
+
+    n_cfg = len(lambda_maxs)
+    x_offset = 3.5
+    target_labels = [0, 1]
+
+    # Generate trajectories
+    logger.info(f"Generating Rectified CFG++ trajectories for lambda_max={lambda_maxs}...")
+    trajectories = {}
+    for target_label in target_labels:
+        trajectories[target_label] = {}
+        for lambda_max in lambda_maxs:
+            traj = sample_euler_rectified_cfg_plusplus_full_trajectory(
+                model, n_samples, target_label,
+                num_steps=num_steps, lambda_max=lambda_max, gamma=gamma, seed=seed
+            )
+            trajectories[target_label][lambda_max] = traj
+
+    # Setup figure
+    fig, axes = plt.subplots(2, n_cfg, figsize=(10, 5))
+
+    # Setup KDE grid
+    x_grid = np.linspace(-7, 7, grid_size * 2)
+    y_grid = np.linspace(-3.5, 3.5, grid_size)
+    X, Y = np.meshgrid(x_grid, y_grid)
+    positions = np.vstack([X.ravel(), Y.ravel()])
+
+    # Get source and target
+    sources = {}
+    targets = {}
+    for target_label in target_labels:
+        sources[target_label] = {lm: trajectories[target_label][lm][0] for lm in lambda_maxs}
+        targets[target_label] = {lm: trajectories[target_label][lm][-1] for lm in lambda_maxs}
+
+    mask_0 = labels == 0
+    mask_1 = labels == 1
+
+    n_animation_frames = num_steps + 1
+    n_hold_frames = int(hold_end_seconds * fps)
+    n_frames = n_animation_frames + n_hold_frames
+
+    def update(frame_idx):
+        actual_frame = min(frame_idx, num_steps)
+        t = actual_frame / num_steps
+
+        for row_idx, target_label in enumerate(target_labels):
+            for col_idx, lambda_max in enumerate(lambda_maxs):
+                ax = axes[row_idx, col_idx]
+                ax.clear()
+
+                current_samples = trajectories[target_label][lambda_max][actual_frame].copy()
+
+                # Training data (right side)
+                train_data_right = data.copy()
+                train_data_right[:, 0] += x_offset
+                ax.scatter(train_data_right[mask_0, 0], train_data_right[mask_0, 1], c="gray", alpha=0.1, s=3)
+                ax.scatter(train_data_right[mask_1, 0], train_data_right[mask_1, 1], c="lightcoral", alpha=0.1, s=3)
+
+                # Source (left) and target (right)
+                source_shifted = sources[target_label][lambda_max].copy()
+                source_shifted[:, 0] -= x_offset
+                target_shifted = targets[target_label][lambda_max].copy()
+                target_shifted[:, 0] += x_offset
+
+                ax.scatter(source_shifted[:, 0], source_shifted[:, 1],
+                           alpha=1.0, s=25, color="dodgerblue", edgecolors="none")
+                ax.scatter(target_shifted[:, 0], target_shifted[:, 1],
+                           alpha=1.0, s=25, color="crimson", edgecolors="none")
+
+                # Current flow
+                data_shifted = current_samples.copy()
+                data_shifted[:, 0] += x_offset * (2 * t - 1)
+
+                try:
+                    kde = gaussian_kde(data_shifted.T, bw_method=0.15)
+                    Z = kde(positions).reshape(grid_size, grid_size * 2)
+                    levels = np.linspace(0, Z.max() * 0.95, 15)
+                    if Z.max() > 0:
+                        ax.contourf(X, Y, Z, levels=levels, cmap="Greens", alpha=0.9)
+                        ax.contour(X, Y, Z, levels=levels[::2], colors="darkgreen", alpha=0.3, linewidths=0.5)
+                except (np.linalg.LinAlgError, ValueError):
+                    ax.scatter(data_shifted[:, 0], data_shifted[:, 1],
+                               alpha=0.5, s=10, color="green", edgecolors="none")
+
+                # Labels
+                ax.text(-x_offset, 3.2, "Source", ha="center", fontsize=9,
+                        fontweight="bold", color="dodgerblue",
+                        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
+                ax.text(x_offset, 3.2, "Target", ha="center", fontsize=9,
+                        fontweight="bold", color="crimson",
+                        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
+
+                if row_idx == 0:
+                    ax.set_title(f"λ_max={lambda_max}", fontsize=11)
+                if col_idx == 0:
+                    ax.text(-6.5, 0, f"Class {target_label}", ha="center", va="center", fontsize=11, rotation=90)
+
+                # Time slider (bottom row)
+                if row_idx == 1:
+                    slider_y = -3.0
+                    ax.plot([-5, 5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
+                    slider_x = -5 + 10.0 * t
+                    ax.scatter([slider_x], [slider_y], s=60, color="darkgreen", zorder=20)
+                    ax.text(-5, slider_y - 0.4, "t=0", ha="center", fontsize=7)
+                    ax.text(5, slider_y - 0.4, "t=1", ha="center", fontsize=7)
+
+                ax.set_xlim(-7, 7)
+                ax.set_ylim(-3.5, 3.5)
+                ax.set_aspect("equal")
+                ax.axis("off")
+
+        return axes.flatten()
+
+    logger.info(f"Creating Rectified CFG++ animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    fig.suptitle("Rectified CFG++ Probability Path", fontsize=12, fontweight="bold", y=0.98)
+    plt.subplots_adjust(left=0.05, right=0.98, top=0.92, bottom=0.05, wspace=0.1, hspace=0.1)
+
+    if save_path:
+        writer = PillowWriter(fps=fps)
+        anim.save(save_path, writer=writer, dpi=dpi)
+        logger.info(f"Saved: {save_path}")
+
+    plt.close(fig)
+
+
+def create_cfg_vs_rectified_side_by_side_animation(
+    model: SimpleFlowNetwork,
+    data: np.ndarray,
+    labels: np.ndarray,
+    guidance_scale: float = 5.0,
+    n_samples: int = 500,
+    num_steps: int = 50,
+    save_path: Optional[str] = None,
+    fps: int = 15,
+    dpi: int = 100,
+    grid_size: int = 80,
+    seed: int = 42,
+    gamma: float = 1.0,
+    hold_end_seconds: float = 3.0,
+):
+    """
+    Create side-by-side animation comparing Standard CFG vs Rectified CFG++.
+
+    Shows both methods at the same guidance scale to highlight differences.
+    Layout: 2 rows (CFG, Rectified CFG++) x 2 columns (Class 0, Class 1)
+    """
+    x_offset = 3.5
+    target_labels = [0, 1]
+
+    # Generate trajectories for both methods
+    logger.info(f"Generating CFG vs Rectified CFG++ trajectories (scale={guidance_scale})...")
+
+    cfg_trajectories = {}
+    rectified_trajectories = {}
+
+    for target_label in target_labels:
+        cfg_trajectories[target_label] = sample_euler_full_trajectory(
+            model, n_samples, target_label,
+            num_steps=num_steps, cfg_scale=guidance_scale, seed=seed
+        )
+        rectified_trajectories[target_label] = sample_euler_rectified_cfg_plusplus_full_trajectory(
+            model, n_samples, target_label,
+            num_steps=num_steps, lambda_max=guidance_scale, gamma=gamma, seed=seed
+        )
+
+    # Setup figure: 2 rows (methods) x 2 columns (classes)
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+
+    # KDE grid
+    x_grid = np.linspace(-7, 7, grid_size * 2)
+    y_grid = np.linspace(-3.5, 3.5, grid_size)
+    X, Y = np.meshgrid(x_grid, y_grid)
+    positions = np.vstack([X.ravel(), Y.ravel()])
+
+    mask_0 = labels == 0
+    mask_1 = labels == 1
+
+    n_animation_frames = num_steps + 1
+    n_hold_frames = int(hold_end_seconds * fps)
+    n_frames = n_animation_frames + n_hold_frames
+
+    methods = [
+        ("Standard CFG", cfg_trajectories, "Blues", "darkblue"),
+        ("Rectified CFG++", rectified_trajectories, "Greens", "darkgreen"),
+    ]
+
+    def update(frame_idx):
+        actual_frame = min(frame_idx, num_steps)
+        t = actual_frame / num_steps
+
+        for row_idx, (method_name, trajectories, cmap, contour_color) in enumerate(methods):
+            for col_idx, target_label in enumerate(target_labels):
+                ax = axes[row_idx, col_idx]
+                ax.clear()
+
+                current_samples = trajectories[target_label][actual_frame].copy()
+
+                # Training data (right side)
+                train_data_right = data.copy()
+                train_data_right[:, 0] += x_offset
+                ax.scatter(train_data_right[mask_0, 0], train_data_right[mask_0, 1], c="gray", alpha=0.1, s=3)
+                ax.scatter(train_data_right[mask_1, 0], train_data_right[mask_1, 1], c="lightcoral", alpha=0.1, s=3)
+
+                # Source and target
+                source = trajectories[target_label][0].copy()
+                source[:, 0] -= x_offset
+                target = trajectories[target_label][-1].copy()
+                target[:, 0] += x_offset
+
+                ax.scatter(source[:, 0], source[:, 1], alpha=1.0, s=20, color="dodgerblue", edgecolors="none")
+                ax.scatter(target[:, 0], target[:, 1], alpha=1.0, s=20, color="crimson", edgecolors="none")
+
+                # Current flow
+                data_shifted = current_samples.copy()
+                data_shifted[:, 0] += x_offset * (2 * t - 1)
+
+                try:
+                    kde = gaussian_kde(data_shifted.T, bw_method=0.15)
+                    Z = kde(positions).reshape(grid_size, grid_size * 2)
+                    levels = np.linspace(0, Z.max() * 0.95, 15)
+                    if Z.max() > 0:
+                        ax.contourf(X, Y, Z, levels=levels, cmap=cmap, alpha=0.9)
+                        ax.contour(X, Y, Z, levels=levels[::2], colors=contour_color, alpha=0.3, linewidths=0.5)
+                except (np.linalg.LinAlgError, ValueError):
+                    ax.scatter(data_shifted[:, 0], data_shifted[:, 1],
+                               alpha=0.5, s=10, color=contour_color, edgecolors="none")
+
+                # Method and class labels
+                if row_idx == 0:
+                    ax.set_title(f"Class {target_label}", fontsize=12, fontweight="bold")
+                if col_idx == 0:
+                    ax.text(-6.5, 0, method_name, ha="center", va="center", fontsize=10, rotation=90, fontweight="bold")
+
+                # Time slider (bottom row only)
+                if row_idx == 1:
+                    slider_y = -3.0
+                    ax.plot([-5, 5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
+                    slider_x = -5 + 10.0 * t
+                    ax.scatter([slider_x], [slider_y], s=60, color="black", zorder=20)
+                    ax.text(-5, slider_y - 0.4, "t=0", ha="center", fontsize=7)
+                    ax.text(5, slider_y - 0.4, "t=1", ha="center", fontsize=7)
+
+                ax.set_xlim(-7, 7)
+                ax.set_ylim(-3.5, 3.5)
+                ax.set_aspect("equal")
+                ax.axis("off")
+
+        return axes.flatten()
+
+    logger.info(f"Creating CFG vs Rectified CFG++ animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    fig.suptitle(f"CFG vs Rectified CFG++ (scale={guidance_scale})", fontsize=14, fontweight="bold", y=0.98)
+    plt.subplots_adjust(left=0.08, right=0.98, top=0.92, bottom=0.05, wspace=0.1, hspace=0.15)
 
     if save_path:
         writer = PillowWriter(fps=fps)
