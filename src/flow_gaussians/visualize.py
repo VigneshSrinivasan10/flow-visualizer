@@ -371,18 +371,21 @@ def create_probability_path_animation(
     n_samples: int = 500,
     num_steps: int = 50,
     save_path: Optional[str] = None,
-    fps: int = 15,
-    dpi: int = 100,
-    grid_size: int = 80,
+    fps: int = 8,
+    dpi: int = 120,
+    grid_size: int = 100,
     seed: int = 42,
-    hold_end_seconds: float = 3.0,
+    hold_end_seconds: float = 2.0,
 ):
     """
     Create animated probability path visualization showing density flow from source to target.
 
-    Creates a 2x3 grid (2 rows for classes, 3 columns for CFG scales).
-    Each subplot shows source distribution on left, target on right, with density
-    flowing between them over time. Training data is shown on target side only.
+    Minimal, clean style inspired by Diffusion Explorer:
+    - Plain white background
+    - Blue source distribution (left)
+    - Red target distribution (right)
+    - Yellow/gold flowing density
+    - Slow, clear animation
 
     Args:
         model: Trained SimpleFlowNetwork
@@ -392,17 +395,17 @@ def create_probability_path_animation(
         n_samples: Number of samples for trajectory
         num_steps: Number of Euler steps (frames in animation)
         save_path: Path to save the GIF
-        fps: Frames per second (default: 15 for slower animation)
+        fps: Frames per second (default: 8 for slow animation)
         dpi: Output resolution
         grid_size: Resolution for KDE grid
         seed: Random seed for reproducibility
-        hold_end_seconds: How long to hold the final frame (default: 3 seconds)
+        hold_end_seconds: How long to hold the final frame
     """
     if cfg_scales is None:
         cfg_scales = [1, 5, 9]
 
     n_cfg = len(cfg_scales)
-    x_offset = 3.5
+    x_offset = 4.0  # Clear separation
     target_labels = [0, 1]
 
     # Generate trajectories for each class and CFG scale
@@ -416,12 +419,13 @@ def create_probability_path_animation(
             )
             trajectories[target_label][cfg_scale] = traj
 
-    # Setup figure: 2 rows (classes), 3 columns (CFG scales)
-    fig, axes = plt.subplots(2, n_cfg, figsize=(10, 5))
+    # Setup figure: 2 rows (classes), n columns (CFG scales)
+    fig, axes = plt.subplots(2, n_cfg, figsize=(4 * n_cfg, 6), facecolor='white')
+    fig.patch.set_facecolor('white')
 
-    # Setup KDE grid (wide enough for shifted data: data range 3.5 + offset 2.5 = 6)
-    x_grid = np.linspace(-7, 7, grid_size * 2)
-    y_grid = np.linspace(-3.5, 3.5, grid_size)
+    # Setup KDE grid
+    x_grid = np.linspace(-8, 8, grid_size * 2)
+    y_grid = np.linspace(-4, 4, grid_size)
     X, Y = np.meshgrid(x_grid, y_grid)
     positions = np.vstack([X.ravel(), Y.ravel()])
 
@@ -432,17 +436,20 @@ def create_probability_path_animation(
         sources[target_label] = {cfg: trajectories[target_label][cfg][0] for cfg in cfg_scales}
         targets[target_label] = {cfg: trajectories[target_label][cfg][-1] for cfg in cfg_scales}
 
-    # Training data masks
-    mask_0 = labels == 0
-    mask_1 = labels == 1
-
-    # Calculate frames: main animation + hold frames at end
+    # Calculate frames
     n_animation_frames = num_steps + 1
     n_hold_frames = int(hold_end_seconds * fps)
     n_frames = n_animation_frames + n_hold_frames
 
+    # Custom yellow/gold colormap for density
+    from matplotlib.colors import LinearSegmentedColormap
+    yellow_cmap = LinearSegmentedColormap.from_list(
+        'yellow_density',
+        ['white', '#FFF59D', '#FFEB3B', '#FFC107', '#FF9800'],
+        N=256
+    )
+
     def update(frame_idx):
-        # Clamp to final frame during hold period
         actual_frame = min(frame_idx, num_steps)
         t = actual_frame / num_steps
 
@@ -450,103 +457,85 @@ def create_probability_path_animation(
             for col_idx, cfg_scale in enumerate(cfg_scales):
                 ax = axes[row_idx, col_idx]
                 ax.clear()
+                ax.set_facecolor('white')
 
                 # Get current samples
                 current_samples = trajectories[target_label][cfg_scale][actual_frame].copy()
 
-                # Plot training data (faded, shifted) - only on target (right) side
-                train_data_right = data.copy()
-                train_data_right[:, 0] += x_offset
-
-                ax.scatter(train_data_right[mask_0, 0], train_data_right[mask_0, 1], c="gray", alpha=0.1, s=3)
-                ax.scatter(train_data_right[mask_1, 0], train_data_right[mask_1, 1], c="lightcoral", alpha=0.1, s=3)
-
-                # Source distribution (shifted left)
+                # Source distribution (shifted left) - BLUE
                 source_shifted = sources[target_label][cfg_scale].copy()
                 source_shifted[:, 0] -= x_offset
-
-                # Target distribution (shifted right)
-                target_shifted = targets[target_label][cfg_scale].copy()
-                target_shifted[:, 0] += x_offset
-
-                # Plot static source (blue) - more visible
                 ax.scatter(
                     source_shifted[:, 0],
                     source_shifted[:, 1],
-                    alpha=1.0,
-                    s=25,
-                    color="dodgerblue",
-                    edgecolors="none",
+                    s=8,
+                    color='#2196F3',  # Material blue
+                    alpha=0.6,
+                    edgecolors='none',
                 )
 
-                # Plot static target (red)
+                # Target distribution (shifted right) - RED
+                target_shifted = targets[target_label][cfg_scale].copy()
+                target_shifted[:, 0] += x_offset
                 ax.scatter(
                     target_shifted[:, 0],
                     target_shifted[:, 1],
-                    alpha=1.0,
-                    s=25,
-                    color="crimson",
-                    edgecolors="none",
+                    s=8,
+                    color='#F44336',  # Material red
+                    alpha=0.6,
+                    edgecolors='none',
                 )
 
                 # Current samples shifted based on time (flow from left to right)
                 data_shifted = current_samples.copy()
                 data_shifted[:, 0] += x_offset * (2 * t - 1)
 
-                # KDE density visualization
+                # KDE density visualization - YELLOW
                 try:
-                    kde = gaussian_kde(data_shifted.T, bw_method=0.15)
+                    kde = gaussian_kde(data_shifted.T, bw_method=0.2)
                     Z = kde(positions).reshape(grid_size, grid_size * 2)
 
-                    levels = np.linspace(0, Z.max() * 0.95, 15)
-                    if Z.max() > 0:
-                        ax.contourf(X, Y, Z, levels=levels, cmap="Blues", alpha=0.9)
-                        ax.contour(X, Y, Z, levels=levels[::2], colors="darkblue", alpha=0.3, linewidths=0.5)
+                    # Normalize and threshold
+                    Z_max = Z.max()
+                    if Z_max > 0:
+                        Z = Z / Z_max
+                        levels = np.linspace(0.05, 1.0, 20)
+                        ax.contourf(X, Y, Z, levels=levels, cmap=yellow_cmap, alpha=0.85)
                 except (np.linalg.LinAlgError, ValueError):
-                    # Fallback to scatter if KDE fails
                     ax.scatter(
                         data_shifted[:, 0],
                         data_shifted[:, 1],
-                        alpha=0.5,
-                        s=10,
-                        color="steelblue",
-                        edgecolors="none",
+                        s=8,
+                        color='#FFC107',
+                        alpha=0.6,
+                        edgecolors='none',
                     )
 
-                # Source and Target labels (top of each subplot)
-                ax.text(-x_offset, 3.2, "Source distribution", ha="center", fontsize=9,
-                        fontweight="bold", color="dodgerblue",
-                        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
-                ax.text(x_offset, 3.2, "Target distribution", ha="center", fontsize=9,
-                        fontweight="bold", color="crimson",
-                        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
-
-                # CFG and Class labels
+                # Minimal labels
                 if row_idx == 0:
-                    ax.set_title(f"CFG={cfg_scale}", fontsize=11)
+                    ax.set_title(f"CFG = {cfg_scale}", fontsize=14, fontweight='normal', pad=10)
                 if col_idx == 0:
-                    ax.text(-6.5, 0, f"Class {target_label}", ha="center", va="center", fontsize=11, rotation=90)
+                    ax.set_ylabel(f"Class {target_label}", fontsize=12, fontweight='normal')
 
-                # Time slider (only on bottom row)
+                # Simple time indicator (bottom center, only bottom row)
                 if row_idx == 1:
-                    slider_y = -3.0
-                    ax.plot([-5, 5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
-                    slider_x = -5 + 10.0 * t
-                    ax.scatter([slider_x], [slider_y], s=60, color="black", zorder=20)
-                    ax.text(-5, slider_y - 0.4, "t=0", ha="center", fontsize=7)
-                    ax.text(5, slider_y - 0.4, "t=1", ha="center", fontsize=7)
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=10, color='#666666')
 
-                ax.set_xlim(-7, 7)
-                ax.set_ylim(-3.5, 3.5)
-                ax.set_aspect("equal")
-                ax.axis("off")
+                # Clean axis
+                ax.set_xlim(-8, 8)
+                ax.set_ylim(-4, 4)
+                ax.set_aspect('equal')
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
 
         return axes.flatten()
 
-    logger.info(f"Creating probability path animation with {n_frames} frames ({n_animation_frames} animation + {n_hold_frames} hold)...")
+    logger.info(f"Creating probability path animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
-    plt.subplots_adjust(left=0.05, right=0.98, top=0.95, bottom=0.05, wspace=0.1, hspace=0.1)
+    plt.tight_layout()
 
     if save_path:
         writer = PillowWriter(fps=fps)
@@ -678,23 +667,28 @@ def create_rectified_cfg_probability_path_animation(
     n_samples: int = 500,
     num_steps: int = 50,
     save_path: Optional[str] = None,
-    fps: int = 15,
-    dpi: int = 100,
-    grid_size: int = 80,
+    fps: int = 8,
+    dpi: int = 120,
+    grid_size: int = 100,
     seed: int = 42,
     gamma: float = 1.0,
-    hold_end_seconds: float = 3.0,
+    hold_end_seconds: float = 2.0,
 ):
     """
     Create animated probability path visualization for Rectified CFG++.
 
-    Similar to create_probability_path_animation but uses the predictor-corrector scheme.
+    Minimal, clean style:
+    - Plain white background
+    - Blue source distribution (left)
+    - Red target distribution (right)
+    - Yellow/gold flowing density
+    - Slow, clear animation
     """
     if lambda_maxs is None:
         lambda_maxs = [1, 5, 9]
 
     n_cfg = len(lambda_maxs)
-    x_offset = 3.5
+    x_offset = 4.0
     target_labels = [0, 1]
 
     # Generate trajectories
@@ -710,11 +704,12 @@ def create_rectified_cfg_probability_path_animation(
             trajectories[target_label][lambda_max] = traj
 
     # Setup figure
-    fig, axes = plt.subplots(2, n_cfg, figsize=(10, 5))
+    fig, axes = plt.subplots(2, n_cfg, figsize=(4 * n_cfg, 6), facecolor='white')
+    fig.patch.set_facecolor('white')
 
     # Setup KDE grid
-    x_grid = np.linspace(-7, 7, grid_size * 2)
-    y_grid = np.linspace(-3.5, 3.5, grid_size)
+    x_grid = np.linspace(-8, 8, grid_size * 2)
+    y_grid = np.linspace(-4, 4, grid_size)
     X, Y = np.meshgrid(x_grid, y_grid)
     positions = np.vstack([X.ravel(), Y.ravel()])
 
@@ -725,12 +720,17 @@ def create_rectified_cfg_probability_path_animation(
         sources[target_label] = {lm: trajectories[target_label][lm][0] for lm in lambda_maxs}
         targets[target_label] = {lm: trajectories[target_label][lm][-1] for lm in lambda_maxs}
 
-    mask_0 = labels == 0
-    mask_1 = labels == 1
-
     n_animation_frames = num_steps + 1
     n_hold_frames = int(hold_end_seconds * fps)
     n_frames = n_animation_frames + n_hold_frames
+
+    # Custom yellow/gold colormap for density
+    from matplotlib.colors import LinearSegmentedColormap
+    yellow_cmap = LinearSegmentedColormap.from_list(
+        'yellow_density',
+        ['white', '#FFF59D', '#FFEB3B', '#FFC107', '#FF9800'],
+        N=256
+    )
 
     def update(frame_idx):
         actual_frame = min(frame_idx, num_steps)
@@ -740,75 +740,81 @@ def create_rectified_cfg_probability_path_animation(
             for col_idx, lambda_max in enumerate(lambda_maxs):
                 ax = axes[row_idx, col_idx]
                 ax.clear()
+                ax.set_facecolor('white')
 
                 current_samples = trajectories[target_label][lambda_max][actual_frame].copy()
 
-                # Training data (right side)
-                train_data_right = data.copy()
-                train_data_right[:, 0] += x_offset
-                ax.scatter(train_data_right[mask_0, 0], train_data_right[mask_0, 1], c="gray", alpha=0.1, s=3)
-                ax.scatter(train_data_right[mask_1, 0], train_data_right[mask_1, 1], c="lightcoral", alpha=0.1, s=3)
-
-                # Source (left) and target (right)
+                # Source (left) - BLUE
                 source_shifted = sources[target_label][lambda_max].copy()
                 source_shifted[:, 0] -= x_offset
+                ax.scatter(
+                    source_shifted[:, 0],
+                    source_shifted[:, 1],
+                    s=8,
+                    color='#2196F3',
+                    alpha=0.6,
+                    edgecolors='none',
+                )
+
+                # Target (right) - RED
                 target_shifted = targets[target_label][lambda_max].copy()
                 target_shifted[:, 0] += x_offset
+                ax.scatter(
+                    target_shifted[:, 0],
+                    target_shifted[:, 1],
+                    s=8,
+                    color='#F44336',
+                    alpha=0.6,
+                    edgecolors='none',
+                )
 
-                ax.scatter(source_shifted[:, 0], source_shifted[:, 1],
-                           alpha=1.0, s=25, color="dodgerblue", edgecolors="none")
-                ax.scatter(target_shifted[:, 0], target_shifted[:, 1],
-                           alpha=1.0, s=25, color="crimson", edgecolors="none")
-
-                # Current flow
+                # Current flow - YELLOW
                 data_shifted = current_samples.copy()
                 data_shifted[:, 0] += x_offset * (2 * t - 1)
 
                 try:
-                    kde = gaussian_kde(data_shifted.T, bw_method=0.15)
+                    kde = gaussian_kde(data_shifted.T, bw_method=0.2)
                     Z = kde(positions).reshape(grid_size, grid_size * 2)
-                    levels = np.linspace(0, Z.max() * 0.95, 15)
-                    if Z.max() > 0:
-                        ax.contourf(X, Y, Z, levels=levels, cmap="Greens", alpha=0.9)
-                        ax.contour(X, Y, Z, levels=levels[::2], colors="darkgreen", alpha=0.3, linewidths=0.5)
+                    Z_max = Z.max()
+                    if Z_max > 0:
+                        Z = Z / Z_max
+                        levels = np.linspace(0.05, 1.0, 20)
+                        ax.contourf(X, Y, Z, levels=levels, cmap=yellow_cmap, alpha=0.85)
                 except (np.linalg.LinAlgError, ValueError):
-                    ax.scatter(data_shifted[:, 0], data_shifted[:, 1],
-                               alpha=0.5, s=10, color="green", edgecolors="none")
+                    ax.scatter(
+                        data_shifted[:, 0],
+                        data_shifted[:, 1],
+                        s=8,
+                        color='#FFC107',
+                        alpha=0.6,
+                        edgecolors='none',
+                    )
 
-                # Labels
-                ax.text(-x_offset, 3.2, "Source", ha="center", fontsize=9,
-                        fontweight="bold", color="dodgerblue",
-                        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
-                ax.text(x_offset, 3.2, "Target", ha="center", fontsize=9,
-                        fontweight="bold", color="crimson",
-                        bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8))
-
+                # Minimal labels
                 if row_idx == 0:
-                    ax.set_title(f"λ_max={lambda_max}", fontsize=11)
+                    ax.set_title(f"λ = {lambda_max}", fontsize=14, fontweight='normal', pad=10)
                 if col_idx == 0:
-                    ax.text(-6.5, 0, f"Class {target_label}", ha="center", va="center", fontsize=11, rotation=90)
+                    ax.set_ylabel(f"Class {target_label}", fontsize=12, fontweight='normal')
 
-                # Time slider (bottom row)
+                # Simple time indicator
                 if row_idx == 1:
-                    slider_y = -3.0
-                    ax.plot([-5, 5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
-                    slider_x = -5 + 10.0 * t
-                    ax.scatter([slider_x], [slider_y], s=60, color="darkgreen", zorder=20)
-                    ax.text(-5, slider_y - 0.4, "t=0", ha="center", fontsize=7)
-                    ax.text(5, slider_y - 0.4, "t=1", ha="center", fontsize=7)
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=10, color='#666666')
 
-                ax.set_xlim(-7, 7)
-                ax.set_ylim(-3.5, 3.5)
-                ax.set_aspect("equal")
-                ax.axis("off")
+                # Clean axis
+                ax.set_xlim(-8, 8)
+                ax.set_ylim(-4, 4)
+                ax.set_aspect('equal')
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
 
         return axes.flatten()
 
     logger.info(f"Creating Rectified CFG++ animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
-    fig.suptitle("Rectified CFG++ Probability Path", fontsize=12, fontweight="bold", y=0.98)
-    plt.subplots_adjust(left=0.05, right=0.98, top=0.92, bottom=0.05, wspace=0.1, hspace=0.1)
+    plt.tight_layout()
 
     if save_path:
         writer = PillowWriter(fps=fps)
@@ -826,20 +832,22 @@ def create_cfg_vs_rectified_side_by_side_animation(
     n_samples: int = 500,
     num_steps: int = 50,
     save_path: Optional[str] = None,
-    fps: int = 15,
-    dpi: int = 100,
-    grid_size: int = 80,
+    fps: int = 8,
+    dpi: int = 120,
+    grid_size: int = 100,
     seed: int = 42,
     gamma: float = 1.0,
-    hold_end_seconds: float = 3.0,
+    hold_end_seconds: float = 2.0,
 ):
     """
     Create side-by-side animation comparing Standard CFG vs Rectified CFG++.
 
-    Shows both methods at the same guidance scale to highlight differences.
-    Layout: 2 rows (CFG, Rectified CFG++) x 2 columns (Class 0, Class 1)
+    Minimal, clean style:
+    - Plain white background
+    - Blue source, red target, yellow density
+    - Slow, clear animation
     """
-    x_offset = 3.5
+    x_offset = 4.0
     target_labels = [0, 1]
 
     # Generate trajectories for both methods
@@ -859,94 +867,116 @@ def create_cfg_vs_rectified_side_by_side_animation(
         )
 
     # Setup figure: 2 rows (methods) x 2 columns (classes)
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8), facecolor='white')
+    fig.patch.set_facecolor('white')
 
     # KDE grid
-    x_grid = np.linspace(-7, 7, grid_size * 2)
-    y_grid = np.linspace(-3.5, 3.5, grid_size)
+    x_grid = np.linspace(-8, 8, grid_size * 2)
+    y_grid = np.linspace(-4, 4, grid_size)
     X, Y = np.meshgrid(x_grid, y_grid)
     positions = np.vstack([X.ravel(), Y.ravel()])
-
-    mask_0 = labels == 0
-    mask_1 = labels == 1
 
     n_animation_frames = num_steps + 1
     n_hold_frames = int(hold_end_seconds * fps)
     n_frames = n_animation_frames + n_hold_frames
 
     methods = [
-        ("Standard CFG", cfg_trajectories, "Blues", "darkblue"),
-        ("Rectified CFG++", rectified_trajectories, "Greens", "darkgreen"),
+        ("Standard CFG", cfg_trajectories),
+        ("Rectified CFG++", rectified_trajectories),
     ]
+
+    # Custom yellow/gold colormap
+    from matplotlib.colors import LinearSegmentedColormap
+    yellow_cmap = LinearSegmentedColormap.from_list(
+        'yellow_density',
+        ['white', '#FFF59D', '#FFEB3B', '#FFC107', '#FF9800'],
+        N=256
+    )
 
     def update(frame_idx):
         actual_frame = min(frame_idx, num_steps)
         t = actual_frame / num_steps
 
-        for row_idx, (method_name, trajectories, cmap, contour_color) in enumerate(methods):
+        for row_idx, (method_name, trajectories) in enumerate(methods):
             for col_idx, target_label in enumerate(target_labels):
                 ax = axes[row_idx, col_idx]
                 ax.clear()
+                ax.set_facecolor('white')
 
                 current_samples = trajectories[target_label][actual_frame].copy()
 
-                # Training data (right side)
-                train_data_right = data.copy()
-                train_data_right[:, 0] += x_offset
-                ax.scatter(train_data_right[mask_0, 0], train_data_right[mask_0, 1], c="gray", alpha=0.1, s=3)
-                ax.scatter(train_data_right[mask_1, 0], train_data_right[mask_1, 1], c="lightcoral", alpha=0.1, s=3)
-
-                # Source and target
+                # Source (left) - BLUE
                 source = trajectories[target_label][0].copy()
                 source[:, 0] -= x_offset
+                ax.scatter(
+                    source[:, 0],
+                    source[:, 1],
+                    s=8,
+                    color='#2196F3',
+                    alpha=0.6,
+                    edgecolors='none',
+                )
+
+                # Target (right) - RED
                 target = trajectories[target_label][-1].copy()
                 target[:, 0] += x_offset
+                ax.scatter(
+                    target[:, 0],
+                    target[:, 1],
+                    s=8,
+                    color='#F44336',
+                    alpha=0.6,
+                    edgecolors='none',
+                )
 
-                ax.scatter(source[:, 0], source[:, 1], alpha=1.0, s=20, color="dodgerblue", edgecolors="none")
-                ax.scatter(target[:, 0], target[:, 1], alpha=1.0, s=20, color="crimson", edgecolors="none")
-
-                # Current flow
+                # Current flow - YELLOW
                 data_shifted = current_samples.copy()
                 data_shifted[:, 0] += x_offset * (2 * t - 1)
 
                 try:
-                    kde = gaussian_kde(data_shifted.T, bw_method=0.15)
+                    kde = gaussian_kde(data_shifted.T, bw_method=0.2)
                     Z = kde(positions).reshape(grid_size, grid_size * 2)
-                    levels = np.linspace(0, Z.max() * 0.95, 15)
-                    if Z.max() > 0:
-                        ax.contourf(X, Y, Z, levels=levels, cmap=cmap, alpha=0.9)
-                        ax.contour(X, Y, Z, levels=levels[::2], colors=contour_color, alpha=0.3, linewidths=0.5)
+                    Z_max = Z.max()
+                    if Z_max > 0:
+                        Z = Z / Z_max
+                        levels = np.linspace(0.05, 1.0, 20)
+                        ax.contourf(X, Y, Z, levels=levels, cmap=yellow_cmap, alpha=0.85)
                 except (np.linalg.LinAlgError, ValueError):
-                    ax.scatter(data_shifted[:, 0], data_shifted[:, 1],
-                               alpha=0.5, s=10, color=contour_color, edgecolors="none")
+                    ax.scatter(
+                        data_shifted[:, 0],
+                        data_shifted[:, 1],
+                        s=8,
+                        color='#FFC107',
+                        alpha=0.6,
+                        edgecolors='none',
+                    )
 
-                # Method and class labels
+                # Minimal labels
                 if row_idx == 0:
-                    ax.set_title(f"Class {target_label}", fontsize=12, fontweight="bold")
+                    ax.set_title(f"Class {target_label}", fontsize=14, fontweight='normal', pad=10)
                 if col_idx == 0:
-                    ax.text(-6.5, 0, method_name, ha="center", va="center", fontsize=10, rotation=90, fontweight="bold")
+                    ax.set_ylabel(method_name, fontsize=12, fontweight='normal')
 
-                # Time slider (bottom row only)
+                # Simple time indicator (bottom row)
                 if row_idx == 1:
-                    slider_y = -3.0
-                    ax.plot([-5, 5], [slider_y, slider_y], color="gray", linewidth=2, alpha=0.5)
-                    slider_x = -5 + 10.0 * t
-                    ax.scatter([slider_x], [slider_y], s=60, color="black", zorder=20)
-                    ax.text(-5, slider_y - 0.4, "t=0", ha="center", fontsize=7)
-                    ax.text(5, slider_y - 0.4, "t=1", ha="center", fontsize=7)
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=10, color='#666666')
 
-                ax.set_xlim(-7, 7)
-                ax.set_ylim(-3.5, 3.5)
-                ax.set_aspect("equal")
-                ax.axis("off")
+                # Clean axis
+                ax.set_xlim(-8, 8)
+                ax.set_ylim(-4, 4)
+                ax.set_aspect('equal')
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
 
         return axes.flatten()
 
     logger.info(f"Creating CFG vs Rectified CFG++ animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
-    fig.suptitle(f"CFG vs Rectified CFG++ (scale={guidance_scale})", fontsize=14, fontweight="bold", y=0.98)
-    plt.subplots_adjust(left=0.08, right=0.98, top=0.92, bottom=0.05, wspace=0.1, hspace=0.15)
+    fig.suptitle(f"Scale = {guidance_scale}", fontsize=14, fontweight='normal', y=0.98)
+    plt.tight_layout()
 
     if save_path:
         writer = PillowWriter(fps=fps)
