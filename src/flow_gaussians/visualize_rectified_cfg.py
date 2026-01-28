@@ -29,7 +29,7 @@ def generate_visualizations(dataset_name: str, seed: int = 42):
         seed: Random seed for reproducibility
     """
     model_dir = Path(f"outputs/flow_gaussians/{dataset_name}")
-    output_dir = model_dir / "visualizations" / "rectified_cfg"
+    output_dir = model_dir / "visualizations"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     np.random.seed(seed)
@@ -69,7 +69,7 @@ def generate_visualizations(dataset_name: str, seed: int = 42):
     logger.info("Creating training data visualization...")
     plot_training_data(
         data, labels,
-        save_path=str(output_dir / "training_data.png"),
+        save_path=str(output_dir / "training_data_rect.png"),
         title=dataset_config["title"],
         class0_centers=class0_centers,
         class1_centers=class1_centers,
@@ -83,7 +83,7 @@ def generate_visualizations(dataset_name: str, seed: int = 42):
         cfg_scales=cfg_scales,
         lambda_maxs=cfg_scales,
         n_samples=n_samples,
-        save_path=str(output_dir / "cfg_vs_rectified_comparison.png"),
+        save_path=str(output_dir / "cfg_vs_rectified_comparison_rect.png"),
         class0_centers=class0_centers,
         class1_centers=class1_centers,
         xlim=xlim, ylim=ylim,
@@ -98,7 +98,7 @@ def generate_visualizations(dataset_name: str, seed: int = 42):
         cfg_scales=animation_scales,
         n_samples=n_samples,
         num_steps=50,
-        save_path=str(output_dir / "cfg_probability_path.gif"),
+        save_path=str(output_dir / "cfg_probability_path_rect.gif"),
         fps=15,
         seed=seed,
     )
@@ -110,7 +110,7 @@ def generate_visualizations(dataset_name: str, seed: int = 42):
         lambda_maxs=animation_scales,
         n_samples=n_samples,
         num_steps=50,
-        save_path=str(output_dir / "rectified_cfg_probability_path.gif"),
+        save_path=str(output_dir / "rectified_cfg_probability_path_rect.gif"),
         fps=15,
         seed=seed,
         gamma=1.0,
@@ -123,7 +123,7 @@ def generate_visualizations(dataset_name: str, seed: int = 42):
         guidance_scale=5.0,
         n_samples=n_samples,
         num_steps=50,
-        save_path=str(output_dir / "cfg_vs_rectified_side_by_side.gif"),
+        save_path=str(output_dir / "cfg_vs_rectified_side_by_side_rect.gif"),
         fps=15,
         seed=seed,
         gamma=1.0,
@@ -136,7 +136,7 @@ def generate_visualizations(dataset_name: str, seed: int = 42):
         guidance_scale=9.0,
         n_samples=n_samples,
         num_steps=50,
-        save_path=str(output_dir / "cfg_vs_rectified_side_by_side_high.gif"),
+        save_path=str(output_dir / "cfg_vs_rectified_side_by_side_high_rect.gif"),
         fps=15,
         seed=seed,
         gamma=1.0,
@@ -148,7 +148,7 @@ def generate_visualizations(dataset_name: str, seed: int = 42):
         model, data, labels,
         cfg_scales=cfg_scales,
         n_samples=n_samples,
-        save_path=str(output_dir / "both_classes_cfg.png"),
+        save_path=str(output_dir / "both_classes_cfg_rect.png"),
         class0_centers=class0_centers,
         class1_centers=class1_centers,
         xlim=xlim, ylim=ylim,
