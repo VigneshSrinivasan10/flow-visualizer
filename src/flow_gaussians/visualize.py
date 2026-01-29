@@ -420,9 +420,9 @@ def create_probability_path_animation(
             trajectories[target_label][cfg_scale] = traj
 
     # Setup figure: 2 rows (classes), n columns (CFG scales)
-    fig, axes = plt.subplots(2, n_cfg, figsize=(5 * n_cfg, 8), facecolor='white')
+    fig, axes = plt.subplots(2, n_cfg, figsize=(5 * n_cfg, 5), facecolor='white')
     fig.patch.set_facecolor('white')
-    fig.subplots_adjust(hspace=0.08, wspace=0.05)
+    fig.subplots_adjust(hspace=0.02, wspace=0.02, top=0.92, bottom=0.05)
 
     # Setup KDE grid
     x_grid = np.linspace(-8, 8, grid_size * 2)
@@ -732,9 +732,9 @@ def create_rectified_cfg_probability_path_animation(
             trajectories[target_label][lambda_max] = traj
 
     # Setup figure
-    fig, axes = plt.subplots(2, n_cfg, figsize=(5 * n_cfg, 8), facecolor='white')
+    fig, axes = plt.subplots(2, n_cfg, figsize=(5 * n_cfg, 5), facecolor='white')
     fig.patch.set_facecolor('white')
-    fig.subplots_adjust(hspace=0.08, wspace=0.05)
+    fig.subplots_adjust(hspace=0.02, wspace=0.02, top=0.92, bottom=0.05)
 
     # Setup KDE grid
     x_grid = np.linspace(-8, 8, grid_size * 2)
@@ -923,9 +923,9 @@ def create_cfg_vs_rectified_side_by_side_animation(
         )
 
     # Setup figure: 2 rows (methods) x 2 columns (classes)
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8), facecolor='white')
+    fig, axes = plt.subplots(2, 2, figsize=(10, 5), facecolor='white')
     fig.patch.set_facecolor('white')
-    fig.subplots_adjust(hspace=0.08, wspace=0.05)
+    fig.subplots_adjust(hspace=0.02, wspace=0.02, top=0.92, bottom=0.05)
 
     # KDE grid
     x_grid = np.linspace(-8, 8, grid_size * 2)
