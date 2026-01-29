@@ -467,22 +467,22 @@ def create_probability_path_animation(
                 # Get current samples
                 current_samples = trajectories[target_label][cfg_scale][actual_frame].copy()
 
-                # Training data (on target/right side) - gray for class 0, red for class 1
+                # Training data (on target/right side) - red first, gray second
                 train_data_right = data.copy()
                 train_data_right[:, 0] += x_offset
-                ax.scatter(
-                    train_data_right[mask_0, 0],
-                    train_data_right[mask_0, 1],
-                    s=30,
-                    color='gray',
-                    alpha=0.2,
-                    edgecolors='none',
-                )
                 ax.scatter(
                     train_data_right[mask_1, 0],
                     train_data_right[mask_1, 1],
                     s=30,
                     color='lightcoral',
+                    alpha=0.2,
+                    edgecolors='none',
+                )
+                ax.scatter(
+                    train_data_right[mask_0, 0],
+                    train_data_right[mask_0, 1],
+                    s=30,
+                    color='gray',
                     alpha=0.2,
                     edgecolors='none',
                 )
@@ -562,8 +562,6 @@ def create_probability_path_animation(
 
     logger.info(f"Creating probability path animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
-
-    plt.tight_layout()
 
     if save_path:
         writer = PillowWriter(fps=fps)
@@ -777,22 +775,22 @@ def create_rectified_cfg_probability_path_animation(
 
                 current_samples = trajectories[target_label][lambda_max][actual_frame].copy()
 
-                # Training data (on target/right side) - gray for class 0, red for class 1
+                # Training data (on target/right side) - red first, gray second
                 train_data_right = data.copy()
                 train_data_right[:, 0] += x_offset
-                ax.scatter(
-                    train_data_right[mask_0, 0],
-                    train_data_right[mask_0, 1],
-                    s=30,
-                    color='gray',
-                    alpha=0.2,
-                    edgecolors='none',
-                )
                 ax.scatter(
                     train_data_right[mask_1, 0],
                     train_data_right[mask_1, 1],
                     s=30,
                     color='lightcoral',
+                    alpha=0.2,
+                    edgecolors='none',
+                )
+                ax.scatter(
+                    train_data_right[mask_0, 0],
+                    train_data_right[mask_0, 1],
+                    s=30,
+                    color='gray',
                     alpha=0.2,
                     edgecolors='none',
                 )
@@ -869,8 +867,6 @@ def create_rectified_cfg_probability_path_animation(
 
     logger.info(f"Creating Rectified CFG++ animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
-
-    plt.tight_layout()
 
     if save_path:
         writer = PillowWriter(fps=fps)
@@ -966,22 +962,22 @@ def create_cfg_vs_rectified_side_by_side_animation(
 
                 current_samples = traj[target_label][actual_frame].copy()
 
-                # Training data (on target/right side) - gray for class 0, red for class 1
+                # Training data (on target/right side) - red first, gray second
                 train_data_right = data.copy()
                 train_data_right[:, 0] += x_offset
-                ax.scatter(
-                    train_data_right[mask_0, 0],
-                    train_data_right[mask_0, 1],
-                    s=30,
-                    color='gray',
-                    alpha=0.2,
-                    edgecolors='none',
-                )
                 ax.scatter(
                     train_data_right[mask_1, 0],
                     train_data_right[mask_1, 1],
                     s=30,
                     color='lightcoral',
+                    alpha=0.2,
+                    edgecolors='none',
+                )
+                ax.scatter(
+                    train_data_right[mask_0, 0],
+                    train_data_right[mask_0, 1],
+                    s=30,
+                    color='gray',
                     alpha=0.2,
                     edgecolors='none',
                 )
@@ -1060,7 +1056,6 @@ def create_cfg_vs_rectified_side_by_side_animation(
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
     fig.suptitle(f"Scale = {guidance_scale}", fontsize=25, fontweight='normal', y=0.98)
-    plt.tight_layout()
 
     if save_path:
         writer = PillowWriter(fps=fps)
