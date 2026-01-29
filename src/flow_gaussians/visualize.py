@@ -472,9 +472,9 @@ def create_probability_path_animation(
                 ax.scatter(
                     train_data_right[:, 0],
                     train_data_right[:, 1],
-                    s=5,
-                    color='#9E9E9E',  # Gray
-                    alpha=0.3,
+                    s=15,
+                    color='gray',
+                    alpha=0.15,
                     edgecolors='none',
                 )
 
@@ -484,10 +484,11 @@ def create_probability_path_animation(
                 ax.scatter(
                     source_shifted[:, 0],
                     source_shifted[:, 1],
-                    s=8,
-                    color='#2196F3',  # Material blue
-                    alpha=0.6,
-                    edgecolors='none',
+                    s=30,
+                    color='#3498db',
+                    alpha=0.7,
+                    edgecolors='black',
+                    linewidths=0.5,
                 )
 
                 # Target distribution (shifted right) - RED
@@ -496,10 +497,11 @@ def create_probability_path_animation(
                 ax.scatter(
                     target_shifted[:, 0],
                     target_shifted[:, 1],
-                    s=8,
-                    color='#F44336',  # Material red
-                    alpha=0.6,
-                    edgecolors='none',
+                    s=30,
+                    color='#e74c3c',
+                    alpha=0.7,
+                    edgecolors='black',
+                    linewidths=0.5,
                 )
 
                 # Current samples shifted based on time (flow from left to right)
@@ -521,21 +523,22 @@ def create_probability_path_animation(
                     ax.scatter(
                         data_shifted[:, 0],
                         data_shifted[:, 1],
-                        s=8,
+                        s=30,
                         color='#FFB74D',
-                        alpha=0.6,
-                        edgecolors='none',
+                        alpha=0.7,
+                        edgecolors='black',
+                        linewidths=0.5,
                     )
 
-                # Minimal labels
+                # Labels matching both_classes_cfg style
                 if row_idx == 0:
-                    ax.set_title(f"CFG = {cfg_scale}", fontsize=14, fontweight='normal', pad=10)
+                    ax.set_title(f"CFG = {cfg_scale}", fontsize=25, fontweight='normal', pad=10)
                 if col_idx == 0:
-                    ax.set_ylabel(f"Class {target_label}", fontsize=12, fontweight='normal')
+                    ax.set_ylabel(f"Class {target_label}", fontsize=25, fontweight='normal')
 
-                # Simple time indicator (bottom center, only bottom row)
+                # Time indicator (bottom center, only bottom row)
                 if row_idx == 1:
-                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=10, color='#666666')
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=18, color='#666666')
 
                 # Clean axis
                 ax.set_xlim(-8, 8)
@@ -770,9 +773,9 @@ def create_rectified_cfg_probability_path_animation(
                 ax.scatter(
                     train_data_right[:, 0],
                     train_data_right[:, 1],
-                    s=5,
-                    color='#9E9E9E',
-                    alpha=0.3,
+                    s=15,
+                    color='gray',
+                    alpha=0.15,
                     edgecolors='none',
                 )
 
@@ -782,10 +785,11 @@ def create_rectified_cfg_probability_path_animation(
                 ax.scatter(
                     source_shifted[:, 0],
                     source_shifted[:, 1],
-                    s=8,
-                    color='#2196F3',
-                    alpha=0.6,
-                    edgecolors='none',
+                    s=30,
+                    color='#3498db',
+                    alpha=0.7,
+                    edgecolors='black',
+                    linewidths=0.5,
                 )
 
                 # Target (right) - RED
@@ -794,10 +798,11 @@ def create_rectified_cfg_probability_path_animation(
                 ax.scatter(
                     target_shifted[:, 0],
                     target_shifted[:, 1],
-                    s=8,
-                    color='#F44336',
-                    alpha=0.6,
-                    edgecolors='none',
+                    s=30,
+                    color='#e74c3c',
+                    alpha=0.7,
+                    edgecolors='black',
+                    linewidths=0.5,
                 )
 
                 # Current flow - LIGHT ORANGE
@@ -816,21 +821,22 @@ def create_rectified_cfg_probability_path_animation(
                     ax.scatter(
                         data_shifted[:, 0],
                         data_shifted[:, 1],
-                        s=8,
+                        s=30,
                         color='#FFB74D',
-                        alpha=0.6,
-                        edgecolors='none',
+                        alpha=0.7,
+                        edgecolors='black',
+                        linewidths=0.5,
                     )
 
-                # Minimal labels
+                # Labels matching both_classes_cfg style
                 if row_idx == 0:
-                    ax.set_title(f"λ = {lambda_max}", fontsize=14, fontweight='normal', pad=10)
+                    ax.set_title(f"λ = {lambda_max}", fontsize=25, fontweight='normal', pad=10)
                 if col_idx == 0:
-                    ax.set_ylabel(f"Class {target_label}", fontsize=12, fontweight='normal')
+                    ax.set_ylabel(f"Class {target_label}", fontsize=25, fontweight='normal')
 
-                # Simple time indicator
+                # Time indicator
                 if row_idx == 1:
-                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=10, color='#666666')
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=18, color='#666666')
 
                 # Clean axis
                 ax.set_xlim(-8, 8)
@@ -943,9 +949,9 @@ def create_cfg_vs_rectified_side_by_side_animation(
                 ax.scatter(
                     train_data_right[:, 0],
                     train_data_right[:, 1],
-                    s=5,
-                    color='#9E9E9E',
-                    alpha=0.3,
+                    s=15,
+                    color='gray',
+                    alpha=0.15,
                     edgecolors='none',
                 )
 
@@ -955,10 +961,11 @@ def create_cfg_vs_rectified_side_by_side_animation(
                 ax.scatter(
                     source[:, 0],
                     source[:, 1],
-                    s=8,
-                    color='#2196F3',
-                    alpha=0.6,
-                    edgecolors='none',
+                    s=30,
+                    color='#3498db',
+                    alpha=0.7,
+                    edgecolors='black',
+                    linewidths=0.5,
                 )
 
                 # Target (right) - RED
@@ -967,10 +974,11 @@ def create_cfg_vs_rectified_side_by_side_animation(
                 ax.scatter(
                     target[:, 0],
                     target[:, 1],
-                    s=8,
-                    color='#F44336',
-                    alpha=0.6,
-                    edgecolors='none',
+                    s=30,
+                    color='#e74c3c',
+                    alpha=0.7,
+                    edgecolors='black',
+                    linewidths=0.5,
                 )
 
                 # Current flow - LIGHT ORANGE
@@ -989,21 +997,22 @@ def create_cfg_vs_rectified_side_by_side_animation(
                     ax.scatter(
                         data_shifted[:, 0],
                         data_shifted[:, 1],
-                        s=8,
+                        s=30,
                         color='#FFB74D',
-                        alpha=0.6,
-                        edgecolors='none',
+                        alpha=0.7,
+                        edgecolors='black',
+                        linewidths=0.5,
                     )
 
-                # Minimal labels
+                # Labels matching both_classes_cfg style
                 if row_idx == 0:
-                    ax.set_title(f"Class {target_label}", fontsize=14, fontweight='normal', pad=10)
+                    ax.set_title(f"Class {target_label}", fontsize=25, fontweight='normal', pad=10)
                 if col_idx == 0:
-                    ax.set_ylabel(method_name, fontsize=12, fontweight='normal')
+                    ax.set_ylabel(method_name, fontsize=25, fontweight='normal')
 
-                # Simple time indicator (bottom row)
+                # Time indicator (bottom row)
                 if row_idx == 1:
-                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=10, color='#666666')
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=18, color='#666666')
 
                 # Clean axis
                 ax.set_xlim(-8, 8)
@@ -1019,7 +1028,7 @@ def create_cfg_vs_rectified_side_by_side_animation(
     logger.info(f"Creating CFG vs Rectified CFG++ animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
-    fig.suptitle(f"Scale = {guidance_scale}", fontsize=14, fontweight='normal', y=0.98)
+    fig.suptitle(f"Scale = {guidance_scale}", fontsize=25, fontweight='normal', y=0.98)
     plt.tight_layout()
 
     if save_path:
