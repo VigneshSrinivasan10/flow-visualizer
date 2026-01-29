@@ -420,8 +420,9 @@ def create_probability_path_animation(
             trajectories[target_label][cfg_scale] = traj
 
     # Setup figure: 2 rows (classes), n columns (CFG scales)
-    fig, axes = plt.subplots(2, n_cfg, figsize=(5 * n_cfg, 10), facecolor='white')
+    fig, axes = plt.subplots(2, n_cfg, figsize=(5 * n_cfg, 8), facecolor='white')
     fig.patch.set_facecolor('white')
+    fig.subplots_adjust(hspace=0.08, wspace=0.05)
 
     # Setup KDE grid
     x_grid = np.linspace(-8, 8, grid_size * 2)
@@ -441,11 +442,11 @@ def create_probability_path_animation(
     n_hold_frames = int(hold_end_seconds * fps)
     n_frames = n_animation_frames + n_hold_frames
 
-    # Custom blue colormap for density (generated samples)
+    # Custom orange colormap for density
     from matplotlib.colors import LinearSegmentedColormap
-    blue_cmap = LinearSegmentedColormap.from_list(
-        'blue_density',
-        ['white', '#BBDEFB', '#90CAF9', '#64B5F6', '#42A5F5', '#2196F3'],
+    orange_cmap = LinearSegmentedColormap.from_list(
+        'orange_density',
+        ['white', '#FFE0B2', '#FFCC80', '#FFB74D', '#FFA726'],
         N=256
     )
 
@@ -472,7 +473,7 @@ def create_probability_path_animation(
                 ax.scatter(
                     train_data_right[mask_0, 0],
                     train_data_right[mask_0, 1],
-                    s=60,
+                    s=30,
                     color='gray',
                     alpha=0.2,
                     edgecolors='none',
@@ -480,7 +481,7 @@ def create_probability_path_animation(
                 ax.scatter(
                     train_data_right[mask_1, 0],
                     train_data_right[mask_1, 1],
-                    s=60,
+                    s=30,
                     color='lightcoral',
                     alpha=0.2,
                     edgecolors='none',
@@ -492,7 +493,7 @@ def create_probability_path_animation(
                 ax.scatter(
                     source_shifted[:, 0],
                     source_shifted[:, 1],
-                    s=80,
+                    s=40,
                     color='#3498db',
                     alpha=0.7,
                     edgecolors='black',
@@ -505,7 +506,7 @@ def create_probability_path_animation(
                 ax.scatter(
                     target_shifted[:, 0],
                     target_shifted[:, 1],
-                    s=80,
+                    s=40,
                     color='#2196F3',
                     alpha=0.7,
                     edgecolors='black',
@@ -516,7 +517,7 @@ def create_probability_path_animation(
                 data_shifted = current_samples.copy()
                 data_shifted[:, 0] += x_offset * (2 * t - 1)
 
-                # KDE density visualization - BLUE
+                # KDE density visualization - ORANGE
                 try:
                     kde = gaussian_kde(data_shifted.T, bw_method=0.2)
                     Z = kde(positions).reshape(grid_size, grid_size * 2)
@@ -526,13 +527,13 @@ def create_probability_path_animation(
                     if Z_max > 0:
                         Z = Z / Z_max
                         levels = np.linspace(0.05, 1.0, 20)
-                        ax.contourf(X, Y, Z, levels=levels, cmap=blue_cmap, alpha=0.85)
+                        ax.contourf(X, Y, Z, levels=levels, cmap=orange_cmap, alpha=0.85)
                 except (np.linalg.LinAlgError, ValueError):
                     ax.scatter(
                         data_shifted[:, 0],
                         data_shifted[:, 1],
-                        s=80,
-                        color='#2196F3',
+                        s=40,
+                        color='#FFA726',
                         alpha=0.7,
                         edgecolors='black',
                         linewidths=0.5,
@@ -540,13 +541,13 @@ def create_probability_path_animation(
 
                 # Labels matching both_classes_cfg style
                 if row_idx == 0:
-                    ax.set_title(f"CFG = {cfg_scale}", fontsize=32, fontweight='normal', pad=10)
+                    ax.set_title(f"CFG = {cfg_scale}", fontsize=25, fontweight='normal', pad=10)
                 if col_idx == 0:
-                    ax.set_ylabel(f"Class {target_label}", fontsize=32, fontweight='normal')
+                    ax.set_ylabel(f"Class {target_label}", fontsize=25, fontweight='normal')
 
                 # Time indicator (bottom center, only bottom row)
                 if row_idx == 1:
-                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=28, color='#666666')
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=20, color='#666666')
 
                 # Clean axis
                 ax.set_xlim(-8, 8)
@@ -731,8 +732,9 @@ def create_rectified_cfg_probability_path_animation(
             trajectories[target_label][lambda_max] = traj
 
     # Setup figure
-    fig, axes = plt.subplots(2, n_cfg, figsize=(5 * n_cfg, 10), facecolor='white')
+    fig, axes = plt.subplots(2, n_cfg, figsize=(5 * n_cfg, 8), facecolor='white')
     fig.patch.set_facecolor('white')
+    fig.subplots_adjust(hspace=0.08, wspace=0.05)
 
     # Setup KDE grid
     x_grid = np.linspace(-8, 8, grid_size * 2)
@@ -751,11 +753,11 @@ def create_rectified_cfg_probability_path_animation(
     n_hold_frames = int(hold_end_seconds * fps)
     n_frames = n_animation_frames + n_hold_frames
 
-    # Custom blue colormap for density (generated samples)
+    # Custom orange colormap for density
     from matplotlib.colors import LinearSegmentedColormap
-    blue_cmap = LinearSegmentedColormap.from_list(
-        'blue_density',
-        ['white', '#BBDEFB', '#90CAF9', '#64B5F6', '#42A5F5', '#2196F3'],
+    orange_cmap = LinearSegmentedColormap.from_list(
+        'orange_density',
+        ['white', '#FFE0B2', '#FFCC80', '#FFB74D', '#FFA726'],
         N=256
     )
 
@@ -781,7 +783,7 @@ def create_rectified_cfg_probability_path_animation(
                 ax.scatter(
                     train_data_right[mask_0, 0],
                     train_data_right[mask_0, 1],
-                    s=60,
+                    s=30,
                     color='gray',
                     alpha=0.2,
                     edgecolors='none',
@@ -789,7 +791,7 @@ def create_rectified_cfg_probability_path_animation(
                 ax.scatter(
                     train_data_right[mask_1, 0],
                     train_data_right[mask_1, 1],
-                    s=60,
+                    s=30,
                     color='lightcoral',
                     alpha=0.2,
                     edgecolors='none',
@@ -801,7 +803,7 @@ def create_rectified_cfg_probability_path_animation(
                 ax.scatter(
                     source_shifted[:, 0],
                     source_shifted[:, 1],
-                    s=80,
+                    s=40,
                     color='#3498db',
                     alpha=0.7,
                     edgecolors='black',
@@ -814,14 +816,14 @@ def create_rectified_cfg_probability_path_animation(
                 ax.scatter(
                     target_shifted[:, 0],
                     target_shifted[:, 1],
-                    s=80,
+                    s=40,
                     color='#2196F3',
                     alpha=0.7,
                     edgecolors='black',
                     linewidths=0.5,
                 )
 
-                # Current flow - BLUE
+                # Current flow - ORANGE
                 data_shifted = current_samples.copy()
                 data_shifted[:, 0] += x_offset * (2 * t - 1)
 
@@ -832,13 +834,13 @@ def create_rectified_cfg_probability_path_animation(
                     if Z_max > 0:
                         Z = Z / Z_max
                         levels = np.linspace(0.05, 1.0, 20)
-                        ax.contourf(X, Y, Z, levels=levels, cmap=blue_cmap, alpha=0.85)
+                        ax.contourf(X, Y, Z, levels=levels, cmap=orange_cmap, alpha=0.85)
                 except (np.linalg.LinAlgError, ValueError):
                     ax.scatter(
                         data_shifted[:, 0],
                         data_shifted[:, 1],
-                        s=80,
-                        color='#2196F3',
+                        s=40,
+                        color='#FFA726',
                         alpha=0.7,
                         edgecolors='black',
                         linewidths=0.5,
@@ -846,13 +848,13 @@ def create_rectified_cfg_probability_path_animation(
 
                 # Labels matching both_classes_cfg style
                 if row_idx == 0:
-                    ax.set_title(f"λ = {lambda_max}", fontsize=32, fontweight='normal', pad=10)
+                    ax.set_title(f"λ = {lambda_max}", fontsize=25, fontweight='normal', pad=10)
                 if col_idx == 0:
-                    ax.set_ylabel(f"Class {target_label}", fontsize=32, fontweight='normal')
+                    ax.set_ylabel(f"Class {target_label}", fontsize=25, fontweight='normal')
 
                 # Time indicator
                 if row_idx == 1:
-                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=28, color='#666666')
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=20, color='#666666')
 
                 # Clean axis
                 ax.set_xlim(-8, 8)
@@ -921,8 +923,9 @@ def create_cfg_vs_rectified_side_by_side_animation(
         )
 
     # Setup figure: 2 rows (methods) x 2 columns (classes)
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10), facecolor='white')
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8), facecolor='white')
     fig.patch.set_facecolor('white')
+    fig.subplots_adjust(hspace=0.08, wspace=0.05)
 
     # KDE grid
     x_grid = np.linspace(-8, 8, grid_size * 2)
@@ -939,11 +942,11 @@ def create_cfg_vs_rectified_side_by_side_animation(
         ("Rectified CFG++", rectified_trajectories),
     ]
 
-    # Custom blue colormap for density (generated samples)
+    # Custom orange colormap for density
     from matplotlib.colors import LinearSegmentedColormap
-    blue_cmap = LinearSegmentedColormap.from_list(
-        'blue_density',
-        ['white', '#BBDEFB', '#90CAF9', '#64B5F6', '#42A5F5', '#2196F3'],
+    orange_cmap = LinearSegmentedColormap.from_list(
+        'orange_density',
+        ['white', '#FFE0B2', '#FFCC80', '#FFB74D', '#FFA726'],
         N=256
     )
 
@@ -969,7 +972,7 @@ def create_cfg_vs_rectified_side_by_side_animation(
                 ax.scatter(
                     train_data_right[mask_0, 0],
                     train_data_right[mask_0, 1],
-                    s=60,
+                    s=30,
                     color='gray',
                     alpha=0.2,
                     edgecolors='none',
@@ -977,7 +980,7 @@ def create_cfg_vs_rectified_side_by_side_animation(
                 ax.scatter(
                     train_data_right[mask_1, 0],
                     train_data_right[mask_1, 1],
-                    s=60,
+                    s=30,
                     color='lightcoral',
                     alpha=0.2,
                     edgecolors='none',
@@ -989,7 +992,7 @@ def create_cfg_vs_rectified_side_by_side_animation(
                 ax.scatter(
                     source[:, 0],
                     source[:, 1],
-                    s=80,
+                    s=40,
                     color='#3498db',
                     alpha=0.7,
                     edgecolors='black',
@@ -1002,14 +1005,14 @@ def create_cfg_vs_rectified_side_by_side_animation(
                 ax.scatter(
                     target[:, 0],
                     target[:, 1],
-                    s=80,
+                    s=40,
                     color='#2196F3',
                     alpha=0.7,
                     edgecolors='black',
                     linewidths=0.5,
                 )
 
-                # Current flow - BLUE
+                # Current flow - ORANGE
                 data_shifted = current_samples.copy()
                 data_shifted[:, 0] += x_offset * (2 * t - 1)
 
@@ -1020,13 +1023,13 @@ def create_cfg_vs_rectified_side_by_side_animation(
                     if Z_max > 0:
                         Z = Z / Z_max
                         levels = np.linspace(0.05, 1.0, 20)
-                        ax.contourf(X, Y, Z, levels=levels, cmap=blue_cmap, alpha=0.85)
+                        ax.contourf(X, Y, Z, levels=levels, cmap=orange_cmap, alpha=0.85)
                 except (np.linalg.LinAlgError, ValueError):
                     ax.scatter(
                         data_shifted[:, 0],
                         data_shifted[:, 1],
-                        s=80,
-                        color='#2196F3',
+                        s=40,
+                        color='#FFA726',
                         alpha=0.7,
                         edgecolors='black',
                         linewidths=0.5,
@@ -1034,13 +1037,13 @@ def create_cfg_vs_rectified_side_by_side_animation(
 
                 # Labels matching both_classes_cfg style
                 if row_idx == 0:
-                    ax.set_title(f"Class {target_label}", fontsize=32, fontweight='normal', pad=10)
+                    ax.set_title(f"Class {target_label}", fontsize=25, fontweight='normal', pad=10)
                 if col_idx == 0:
-                    ax.set_ylabel(method_name, fontsize=32, fontweight='normal')
+                    ax.set_ylabel(method_name, fontsize=25, fontweight='normal')
 
                 # Time indicator (bottom row)
                 if row_idx == 1:
-                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=28, color='#666666')
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=20, color='#666666')
 
                 # Clean axis
                 ax.set_xlim(-8, 8)
@@ -1056,7 +1059,7 @@ def create_cfg_vs_rectified_side_by_side_animation(
     logger.info(f"Creating CFG vs Rectified CFG++ animation with {n_frames} frames...")
     anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
 
-    fig.suptitle(f"Scale = {guidance_scale}", fontsize=32, fontweight='normal', y=0.98)
+    fig.suptitle(f"Scale = {guidance_scale}", fontsize=25, fontweight='normal', y=0.98)
     plt.tight_layout()
 
     if save_path:
