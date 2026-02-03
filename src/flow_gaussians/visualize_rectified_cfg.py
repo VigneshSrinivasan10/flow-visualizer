@@ -12,6 +12,8 @@ from flow_gaussians.visualize import (
     create_cfg_vs_rectified_side_by_side_animation,
     create_probability_path_animation,
     create_rectified_cfg_probability_path_animation,
+    create_rectified_trajectory_animation,
+    create_trajectory_animation,
     plot_both_classes_cfg,
     plot_cfg_vs_rectified_comparison,
     plot_training_data,
@@ -111,6 +113,33 @@ def generate_visualizations(dataset_name: str, seed: int = 42):
         n_samples=n_samples,
         num_steps=50,
         save_path=str(output_dir / "rectified_cfg_probability_path_rect.gif"),
+        fps=15,
+        seed=seed,
+        gamma=1.0,
+    )
+
+    # 4b. Standard CFG trajectory animation
+    logger.info("Creating Standard CFG trajectory animation...")
+    create_trajectory_animation(
+        model, data, labels,
+        cfg_scales=animation_scales,
+        n_particles=50,
+        n_samples=n_samples,
+        num_steps=50,
+        save_path=str(output_dir / "cfg_trajectory.gif"),
+        fps=15,
+        seed=seed,
+    )
+
+    # 4c. Rectified CFG++ trajectory animation
+    logger.info("Creating Rectified CFG++ trajectory animation...")
+    create_rectified_trajectory_animation(
+        model, data, labels,
+        lambda_maxs=animation_scales,
+        n_particles=50,
+        n_samples=n_samples,
+        num_steps=50,
+        save_path=str(output_dir / "rectified_cfg_trajectory.gif"),
         fps=15,
         seed=seed,
         gamma=1.0,

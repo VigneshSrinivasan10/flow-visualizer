@@ -571,6 +571,385 @@ def create_probability_path_animation(
     plt.close(fig)
 
 
+def create_trajectory_animation(
+    model: SimpleFlowNetwork,
+    data: np.ndarray,
+    labels: np.ndarray,
+    cfg_scales: List[float] = None,
+    n_particles: int = 50,
+    n_samples: int = 500,
+    num_steps: int = 50,
+    save_path: Optional[str] = None,
+    fps: int = 15,
+    dpi: int = 120,
+    seed: int = 42,
+    hold_end_seconds: float = 2.0,
+) -> None:
+    """
+    Create trajectory animation with moving particles and trails for CFG sampling.
+
+    Shows particles flowing from source (left) to target (right) with colored trails
+    indicating the path curvature. Grid layout: 2 rows (classes) × N columns (CFG scales).
+
+    Args:
+        model: Trained flow network
+        data: Training data for background visualization
+        labels: Training data labels
+        cfg_scales: List of CFG guidance scales to visualize
+        n_particles: Number of particle trajectories to show
+        n_samples: Total samples to generate (particles selected from these)
+        num_steps: Number of Euler integration steps
+        save_path: Path to save the GIF
+        fps: Frames per second
+        dpi: Resolution of output
+        seed: Random seed for reproducibility
+        hold_end_seconds: How long to hold the final frame
+    """
+    if cfg_scales is None:
+        cfg_scales = [1, 5, 9]
+
+    n_cfg = len(cfg_scales)
+    x_offset = 4.0
+    target_labels = [0, 1]
+
+    np.random.seed(seed)
+
+    # Generate trajectories for each class and CFG scale
+    logger.info(f"Generating trajectories for CFG scales {cfg_scales}...")
+    trajectories = {}
+    for target_label in target_labels:
+        trajectories[target_label] = {}
+        for cfg_scale in cfg_scales:
+            traj = sample_euler_full_trajectory(
+                model, n_samples, target_label, num_steps=num_steps, cfg_scale=cfg_scale, seed=seed
+            )
+            trajectories[target_label][cfg_scale] = traj
+
+    # Select particle indices to track (same across all subplots for consistency)
+    particle_indices = np.random.choice(n_samples, size=n_particles, replace=False)
+
+    # Extract particle paths with left-right transformation
+    particle_paths = {}
+    for target_label in target_labels:
+        particle_paths[target_label] = {}
+        for cfg_scale in cfg_scales:
+            traj = trajectories[target_label][cfg_scale]
+            n_frames = len(traj)
+            paths = []
+            for idx in particle_indices:
+                path = []
+                for frame_idx in range(n_frames):
+                    t = frame_idx / (n_frames - 1)
+                    pt = traj[frame_idx][idx]
+                    x_pos = pt[0] + x_offset * (2 * t - 1)
+                    path.append([x_pos, pt[1]])
+                paths.append(np.array(path))
+            particle_paths[target_label][cfg_scale] = np.array(paths)
+
+    # Setup figure: 2 rows (classes), n columns (CFG scales)
+    fig, axes = plt.subplots(2, n_cfg, figsize=(5 * n_cfg, 5), facecolor='white')
+    fig.patch.set_facecolor('white')
+    fig.subplots_adjust(hspace=0.02, wspace=0.02, top=0.92, bottom=0.05)
+
+    # Particle colors
+    colors = plt.cm.coolwarm(np.linspace(0.1, 0.9, n_particles))
+
+    # Training data masks
+    mask_0 = labels == 0
+    mask_1 = labels == 1
+
+    # Calculate frames
+    n_animation_frames = num_steps + 1
+    n_hold_frames = int(hold_end_seconds * fps)
+    n_frames = n_animation_frames + n_hold_frames
+
+    def update(frame_idx):
+        actual_frame = min(frame_idx, num_steps)
+        t = actual_frame / num_steps
+
+        for row_idx, target_label in enumerate(target_labels):
+            for col_idx, cfg_scale in enumerate(cfg_scales):
+                ax = axes[row_idx, col_idx]
+                ax.clear()
+                ax.set_facecolor('white')
+
+                paths = particle_paths[target_label][cfg_scale]
+
+                # Training data on right side (target)
+                train_data_right = data.copy()
+                train_data_right[:, 0] += x_offset
+                ax.scatter(
+                    train_data_right[mask_1, 0],
+                    train_data_right[mask_1, 1],
+                    s=30,
+                    color='lightcoral',
+                    alpha=0.2,
+                    edgecolors='none',
+                )
+                ax.scatter(
+                    train_data_right[mask_0, 0],
+                    train_data_right[mask_0, 1],
+                    s=30,
+                    color='gray',
+                    alpha=0.2,
+                    edgecolors='none',
+                )
+
+                # Draw full trajectory lines (faded gray) showing curvature
+                for i, path in enumerate(paths):
+                    ax.plot(
+                        path[:, 0],
+                        path[:, 1],
+                        alpha=0.15,
+                        linewidth=1,
+                        color='gray',
+                    )
+
+                # Draw colored trails up to current frame
+                for i, path in enumerate(paths):
+                    if actual_frame > 0:
+                        ax.plot(
+                            path[:actual_frame + 1, 0],
+                            path[:actual_frame + 1, 1],
+                            alpha=0.6,
+                            linewidth=1.5,
+                            color=colors[i],
+                        )
+
+                    # Draw current position
+                    ax.scatter(
+                        path[actual_frame, 0],
+                        path[actual_frame, 1],
+                        s=30,
+                        color=colors[i],
+                        edgecolors='black',
+                        linewidth=0.5,
+                        zorder=10,
+                    )
+
+                # Labels
+                if row_idx == 0:
+                    ax.set_title(f"CFG = {cfg_scale}", fontsize=25, fontweight='normal', pad=10)
+                if col_idx == 0:
+                    ax.set_ylabel(f"Class {target_label}", fontsize=25, fontweight='normal')
+
+                # Time indicator (bottom row only)
+                if row_idx == 1:
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=20, color='#666666')
+
+                # Clean axis
+                ax.set_xlim(-8, 8)
+                ax.set_ylim(-4, 4)
+                ax.set_aspect('equal')
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
+
+        return axes.flatten()
+
+    logger.info(f"Creating trajectory animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    if save_path:
+        writer = PillowWriter(fps=fps)
+        anim.save(save_path, writer=writer, dpi=dpi)
+        logger.info(f"Saved: {save_path}")
+
+    plt.close(fig)
+
+
+def create_rectified_trajectory_animation(
+    model: SimpleFlowNetwork,
+    data: np.ndarray,
+    labels: np.ndarray,
+    lambda_maxs: List[float] = None,
+    n_particles: int = 50,
+    n_samples: int = 500,
+    num_steps: int = 50,
+    save_path: Optional[str] = None,
+    fps: int = 15,
+    dpi: int = 120,
+    seed: int = 42,
+    hold_end_seconds: float = 2.0,
+    gamma: float = 1.0,
+) -> None:
+    """
+    Create trajectory animation with moving particles and trails for Rectified CFG++.
+
+    Shows particles flowing from source (left) to target (right) with colored trails
+    indicating the path curvature. Grid layout: 2 rows (classes) × N columns (lambda_max values).
+
+    Args:
+        model: Trained flow network
+        data: Training data for background visualization
+        labels: Training data labels
+        lambda_maxs: List of lambda_max guidance values to visualize
+        n_particles: Number of particle trajectories to show
+        n_samples: Total samples to generate (particles selected from these)
+        num_steps: Number of Euler integration steps
+        save_path: Path to save the GIF
+        fps: Frames per second
+        dpi: Resolution of output
+        seed: Random seed for reproducibility
+        hold_end_seconds: How long to hold the final frame
+        gamma: Schedule decay power for Rectified CFG++
+    """
+    if lambda_maxs is None:
+        lambda_maxs = [1, 5, 9]
+
+    n_cfg = len(lambda_maxs)
+    x_offset = 4.0
+    target_labels = [0, 1]
+
+    np.random.seed(seed)
+
+    # Generate trajectories for each class and lambda_max
+    logger.info(f"Generating trajectories for lambda_max values {lambda_maxs}...")
+    trajectories = {}
+    for target_label in target_labels:
+        trajectories[target_label] = {}
+        for lambda_max in lambda_maxs:
+            traj = sample_euler_rectified_cfg_plusplus_full_trajectory(
+                model, n_samples, target_label, num_steps=num_steps,
+                lambda_max=lambda_max, gamma=gamma, seed=seed
+            )
+            trajectories[target_label][lambda_max] = traj
+
+    # Select particle indices to track (same across all subplots for consistency)
+    particle_indices = np.random.choice(n_samples, size=n_particles, replace=False)
+
+    # Extract particle paths with left-right transformation
+    particle_paths = {}
+    for target_label in target_labels:
+        particle_paths[target_label] = {}
+        for lambda_max in lambda_maxs:
+            traj = trajectories[target_label][lambda_max]
+            n_frames = len(traj)
+            paths = []
+            for idx in particle_indices:
+                path = []
+                for frame_idx in range(n_frames):
+                    t = frame_idx / (n_frames - 1)
+                    pt = traj[frame_idx][idx]
+                    x_pos = pt[0] + x_offset * (2 * t - 1)
+                    path.append([x_pos, pt[1]])
+                paths.append(np.array(path))
+            particle_paths[target_label][lambda_max] = np.array(paths)
+
+    # Setup figure: 2 rows (classes), n columns (lambda_max values)
+    fig, axes = plt.subplots(2, n_cfg, figsize=(5 * n_cfg, 5), facecolor='white')
+    fig.patch.set_facecolor('white')
+    fig.subplots_adjust(hspace=0.02, wspace=0.02, top=0.92, bottom=0.05)
+
+    # Particle colors
+    colors = plt.cm.coolwarm(np.linspace(0.1, 0.9, n_particles))
+
+    # Training data masks
+    mask_0 = labels == 0
+    mask_1 = labels == 1
+
+    # Calculate frames
+    n_animation_frames = num_steps + 1
+    n_hold_frames = int(hold_end_seconds * fps)
+    n_frames = n_animation_frames + n_hold_frames
+
+    def update(frame_idx):
+        actual_frame = min(frame_idx, num_steps)
+        t = actual_frame / num_steps
+
+        for row_idx, target_label in enumerate(target_labels):
+            for col_idx, lambda_max in enumerate(lambda_maxs):
+                ax = axes[row_idx, col_idx]
+                ax.clear()
+                ax.set_facecolor('white')
+
+                paths = particle_paths[target_label][lambda_max]
+
+                # Training data on right side (target)
+                train_data_right = data.copy()
+                train_data_right[:, 0] += x_offset
+                ax.scatter(
+                    train_data_right[mask_1, 0],
+                    train_data_right[mask_1, 1],
+                    s=30,
+                    color='lightcoral',
+                    alpha=0.2,
+                    edgecolors='none',
+                )
+                ax.scatter(
+                    train_data_right[mask_0, 0],
+                    train_data_right[mask_0, 1],
+                    s=30,
+                    color='gray',
+                    alpha=0.2,
+                    edgecolors='none',
+                )
+
+                # Draw full trajectory lines (faded gray) showing curvature
+                for i, path in enumerate(paths):
+                    ax.plot(
+                        path[:, 0],
+                        path[:, 1],
+                        alpha=0.15,
+                        linewidth=1,
+                        color='gray',
+                    )
+
+                # Draw colored trails up to current frame
+                for i, path in enumerate(paths):
+                    if actual_frame > 0:
+                        ax.plot(
+                            path[:actual_frame + 1, 0],
+                            path[:actual_frame + 1, 1],
+                            alpha=0.6,
+                            linewidth=1.5,
+                            color=colors[i],
+                        )
+
+                    # Draw current position
+                    ax.scatter(
+                        path[actual_frame, 0],
+                        path[actual_frame, 1],
+                        s=30,
+                        color=colors[i],
+                        edgecolors='black',
+                        linewidth=0.5,
+                        zorder=10,
+                    )
+
+                # Labels
+                if row_idx == 0:
+                    ax.set_title(f"λ_max = {lambda_max}", fontsize=25, fontweight='normal', pad=10)
+                if col_idx == 0:
+                    ax.set_ylabel(f"Class {target_label}", fontsize=25, fontweight='normal')
+
+                # Time indicator (bottom row only)
+                if row_idx == 1:
+                    ax.text(0, -3.5, f"t = {t:.2f}", ha='center', fontsize=20, color='#666666')
+
+                # Clean axis
+                ax.set_xlim(-8, 8)
+                ax.set_ylim(-4, 4)
+                ax.set_aspect('equal')
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
+
+        return axes.flatten()
+
+    logger.info(f"Creating rectified trajectory animation with {n_frames} frames...")
+    anim = FuncAnimation(fig, update, frames=n_frames, interval=1000 / fps)
+
+    if save_path:
+        writer = PillowWriter(fps=fps)
+        anim.save(save_path, writer=writer, dpi=dpi)
+        logger.info(f"Saved: {save_path}")
+
+    plt.close(fig)
+
+
 def plot_cfg_vs_rectified_comparison(
     model: SimpleFlowNetwork,
     data: np.ndarray,
