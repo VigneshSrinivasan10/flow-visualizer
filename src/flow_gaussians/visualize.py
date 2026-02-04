@@ -651,8 +651,8 @@ def create_trajectory_animation(
     fig.patch.set_facecolor('white')
     fig.subplots_adjust(hspace=0.02, wspace=0.02, top=0.92, bottom=0.05)
 
-    # Particle colors
-    colors = plt.cm.coolwarm(np.linspace(0.1, 0.9, n_particles))
+    # Orange color for particles (matching probability path style)
+    particle_color = '#FFA726'
 
     # Training data masks
     mask_0 = labels == 0
@@ -695,17 +695,17 @@ def create_trajectory_animation(
                     edgecolors='none',
                 )
 
-                # Draw full trajectory lines (faded gray) showing curvature
+                # Draw full trajectory lines (faded orange) showing curvature
                 for i, path in enumerate(paths):
                     ax.plot(
                         path[:, 0],
                         path[:, 1],
                         alpha=0.15,
                         linewidth=1,
-                        color='gray',
+                        color='#FFCC80',
                     )
 
-                # Draw colored trails up to current frame
+                # Draw orange trails up to current frame
                 for i, path in enumerate(paths):
                     if actual_frame > 0:
                         ax.plot(
@@ -713,7 +713,7 @@ def create_trajectory_animation(
                             path[:actual_frame + 1, 1],
                             alpha=0.6,
                             linewidth=1.5,
-                            color=colors[i],
+                            color=particle_color,
                         )
 
                     # Draw current position
@@ -721,7 +721,7 @@ def create_trajectory_animation(
                         path[actual_frame, 0],
                         path[actual_frame, 1],
                         s=30,
-                        color=colors[i],
+                        color=particle_color,
                         edgecolors='black',
                         linewidth=0.5,
                         zorder=10,
@@ -842,8 +842,8 @@ def create_rectified_trajectory_animation(
     fig.patch.set_facecolor('white')
     fig.subplots_adjust(hspace=0.02, wspace=0.02, top=0.92, bottom=0.05)
 
-    # Particle colors
-    colors = plt.cm.coolwarm(np.linspace(0.1, 0.9, n_particles))
+    # Orange color for particles (matching probability path style)
+    particle_color = '#FFA726'
 
     # Training data masks
     mask_0 = labels == 0
@@ -886,17 +886,17 @@ def create_rectified_trajectory_animation(
                     edgecolors='none',
                 )
 
-                # Draw full trajectory lines (faded gray) showing curvature
+                # Draw full trajectory lines (faded orange) showing curvature
                 for i, path in enumerate(paths):
                     ax.plot(
                         path[:, 0],
                         path[:, 1],
                         alpha=0.15,
                         linewidth=1,
-                        color='gray',
+                        color='#FFCC80',
                     )
 
-                # Draw colored trails up to current frame
+                # Draw orange trails up to current frame
                 for i, path in enumerate(paths):
                     if actual_frame > 0:
                         ax.plot(
@@ -904,7 +904,7 @@ def create_rectified_trajectory_animation(
                             path[:actual_frame + 1, 1],
                             alpha=0.6,
                             linewidth=1.5,
-                            color=colors[i],
+                            color=particle_color,
                         )
 
                     # Draw current position
@@ -912,7 +912,7 @@ def create_rectified_trajectory_animation(
                         path[actual_frame, 0],
                         path[actual_frame, 1],
                         s=30,
-                        color=colors[i],
+                        color=particle_color,
                         edgecolors='black',
                         linewidth=0.5,
                         zorder=10,
