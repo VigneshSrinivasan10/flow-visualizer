@@ -33,6 +33,7 @@ fg-distill = "flow_gaussians.train_distill:main"
 fg-distill-viz = "flow_gaussians.visualize_distill:main"
 cfg-train = "cfg.train:main"
 cfg-visualize = "cfg.visualize:main"
+cfg-temp = "cfg.visualize_temperature:main"
 rcfg-visualize = "cfg.visualize_rectified_cfgpp:main"
 
 [tool.uv]
