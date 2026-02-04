@@ -29,6 +29,9 @@ am-train = "adjoint_matching.train:main"
 am-visualize = "adjoint_matching.visualize:main"
 fg-train = "flow_gaussians.train:main"
 fg-visualize = "flow_gaussians.visualize:main"
+cfg-train = "cfg.train:main"
+cfg-visualize = "cfg.visualize:main"
+rcfg-visualize = "cfg.visualize_rectified_cfgpp:main"
 
 [tool.uv]
 package = true
