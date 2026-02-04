@@ -59,6 +59,12 @@ outputs/flow_gaussians/*/visualizations/*
 outputs/flow_gaussians/*/visualizations/*/*
 !outputs/flow_gaussians/*/visualizations/*/*.gif
 !outputs/flow_gaussians/*/visualizations/*/*.png
+!outputs/flow_gaussians/*/distilled/
+outputs/flow_gaussians/*/distilled/*
+!outputs/flow_gaussians/*/distilled/visualizations/
+outputs/flow_gaussians/*/distilled/visualizations/*
+!outputs/flow_gaussians/*/distilled/visualizations/*.gif
+!outputs/flow_gaussians/*/distilled/visualizations/*.png
 *.pt
 *.pth
 *.ckpt
