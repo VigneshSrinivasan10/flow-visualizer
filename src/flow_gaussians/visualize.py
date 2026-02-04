@@ -541,7 +541,7 @@ def create_probability_path_animation(
 
                 # Labels matching both_classes_cfg style
                 if row_idx == 0:
-                    ax.set_title(f"CFG = {cfg_scale}", fontsize=25, fontweight='normal', pad=10)
+                    ax.set_title(f"λ = {cfg_scale}", fontsize=25, fontweight='normal', pad=10)
                 if col_idx == 0:
                     ax.set_ylabel(f"Class {target_label}", fontsize=25, fontweight='normal')
 
@@ -729,7 +729,7 @@ def create_trajectory_animation(
 
                 # Labels
                 if row_idx == 0:
-                    ax.set_title(f"CFG = {cfg_scale}", fontsize=25, fontweight='normal', pad=10)
+                    ax.set_title(f"λ = {cfg_scale}", fontsize=25, fontweight='normal', pad=10)
                 if col_idx == 0:
                     ax.set_ylabel(f"Class {target_label}", fontsize=25, fontweight='normal')
 
