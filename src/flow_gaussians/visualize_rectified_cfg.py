@@ -53,14 +53,20 @@ def generate_visualizations(dataset_name: str, seed: int = 42):
     logger.info(f"Generating data for {dataset_name}...")
     data, labels = dataset_config["generator"](n_samples=5000)
 
-    # Load model
+    # Load model (prefer reflowed model if available)
+    reflowed_path = model_dir / "flow_model_reflowed.npz"
     model_path = model_dir / "flow_model.npz"
-    if not model_path.exists():
-        raise FileNotFoundError(f"Model not found at {model_path}. Run training first.")
 
-    logger.info(f"Loading model from {model_path}")
-    model = SimpleFlowNetwork(hidden_dim=128)
-    model.load(str(model_path))
+    if reflowed_path.exists():
+        logger.info(f"Loading reflowed model from {reflowed_path}")
+        model = SimpleFlowNetwork(hidden_dim=128)
+        model.load(str(reflowed_path))
+    elif model_path.exists():
+        logger.info(f"Loading model from {model_path}")
+        model = SimpleFlowNetwork(hidden_dim=128)
+        model.load(str(model_path))
+    else:
+        raise FileNotFoundError(f"Model not found at {model_path}. Run training first.")
 
     # Visualization parameters
     n_samples = 500

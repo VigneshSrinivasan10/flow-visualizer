@@ -920,7 +920,7 @@ def create_rectified_trajectory_animation(
 
                 # Labels
                 if row_idx == 0:
-                    ax.set_title(f"λ_max = {lambda_max}", fontsize=25, fontweight='normal', pad=10)
+                    ax.set_title(f"λ = {lambda_max}", fontsize=25, fontweight='normal', pad=10)
                 if col_idx == 0:
                     ax.set_ylabel(f"Class {target_label}", fontsize=25, fontweight='normal')
 
