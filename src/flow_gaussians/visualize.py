@@ -628,6 +628,13 @@ def create_trajectory_animation(
     # Select particle indices to track (same across all subplots for consistency)
     particle_indices = np.random.choice(n_samples, size=n_particles, replace=False)
 
+    # Get source distributions (t=0) for each class and cfg_scale
+    sources = {}
+    for target_label in target_labels:
+        sources[target_label] = {}
+        for cfg_scale in cfg_scales:
+            sources[target_label][cfg_scale] = trajectories[target_label][cfg_scale][0]
+
     # Extract particle paths with left-right transformation
     particle_paths = {}
     for target_label in target_labels:
@@ -693,6 +700,19 @@ def create_trajectory_animation(
                     color='gray',
                     alpha=0.2,
                     edgecolors='none',
+                )
+
+                # Source distribution (shifted left) - BLUE
+                source_shifted = sources[target_label][cfg_scale].copy()
+                source_shifted[:, 0] -= x_offset
+                ax.scatter(
+                    source_shifted[:, 0],
+                    source_shifted[:, 1],
+                    s=40,
+                    color='#3498db',
+                    alpha=0.7,
+                    edgecolors='black',
+                    linewidths=0.5,
                 )
 
                 # Draw full trajectory lines (faded orange) showing curvature
@@ -819,6 +839,13 @@ def create_rectified_trajectory_animation(
     # Select particle indices to track (same across all subplots for consistency)
     particle_indices = np.random.choice(n_samples, size=n_particles, replace=False)
 
+    # Get source distributions (t=0) for each class and lambda_max
+    sources = {}
+    for target_label in target_labels:
+        sources[target_label] = {}
+        for lambda_max in lambda_maxs:
+            sources[target_label][lambda_max] = trajectories[target_label][lambda_max][0]
+
     # Extract particle paths with left-right transformation
     particle_paths = {}
     for target_label in target_labels:
@@ -884,6 +911,19 @@ def create_rectified_trajectory_animation(
                     color='gray',
                     alpha=0.2,
                     edgecolors='none',
+                )
+
+                # Source distribution (shifted left) - BLUE
+                source_shifted = sources[target_label][lambda_max].copy()
+                source_shifted[:, 0] -= x_offset
+                ax.scatter(
+                    source_shifted[:, 0],
+                    source_shifted[:, 1],
+                    s=40,
+                    color='#3498db',
+                    alpha=0.7,
+                    edgecolors='black',
+                    linewidths=0.5,
                 )
 
                 # Draw full trajectory lines (faded orange) showing curvature
