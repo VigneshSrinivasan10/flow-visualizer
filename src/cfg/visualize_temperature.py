@@ -407,7 +407,7 @@ def main(cfg: DictConfig) -> None:
     logger.info("Model loaded successfully")
 
     # Create output directory for temperature experiments
-    output_dir = Path("outputs/cfg/temperature_scaling")
+    output_dir = Path(cfg.visualization.output_dir).parent / "temperature_scaling"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Parameters

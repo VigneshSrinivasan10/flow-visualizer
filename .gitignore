@@ -41,6 +41,10 @@ outputs/cfg/*
 outputs/cfg/visualizations/*
 !outputs/cfg/visualizations/*.gif
 !outputs/cfg/visualizations/*.png
+!outputs/cfg/temperature_scaling/
+outputs/cfg/temperature_scaling/*
+!outputs/cfg/temperature_scaling/*.gif
+!outputs/cfg/temperature_scaling/*.png
 !outputs/cfg_overlap/
 outputs/cfg_overlap/*
 !outputs/cfg_overlap/visualizations/
