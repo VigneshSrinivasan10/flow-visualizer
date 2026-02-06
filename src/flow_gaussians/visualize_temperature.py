@@ -76,15 +76,32 @@ def plot_temperature_comparison(
     mask_0 = labels == 0
     mask_1 = labels == 1
 
+    # Pre-generate all samples to compute per-column axis limits
+    all_samples = {}
     for row_idx, target_label in enumerate([0, 1]):
         for col_idx, temp in enumerate(temperature_values):
-            ax = axes[row_idx, col_idx]
-
             samples = sample_euler_temperature(
                 model, n_samples, target_label,
                 num_steps=100, cfg_scale=cfg_scale,
                 temperature=temp, seed=seed + row_idx,
             )
+            all_samples[(row_idx, col_idx)] = samples
+
+    # Compute per-column limits (shared across both classes)
+    col_limits = {}
+    for col_idx, temp in enumerate(temperature_values):
+        all_col_pts = np.vstack([all_samples[(r, col_idx)] for r in range(2)])
+        margin = 0.5
+        max_abs = max(
+            np.abs(all_col_pts).max(),
+            max(max(abs(c[0]), abs(c[1])) for c in (class0_centers or []) + (class1_centers or [])) + 1.0,
+        )
+        col_limits[col_idx] = (-max_abs - margin, max_abs + margin)
+
+    for row_idx, target_label in enumerate([0, 1]):
+        for col_idx, temp in enumerate(temperature_values):
+            ax = axes[row_idx, col_idx]
+            samples = all_samples[(row_idx, col_idx)]
 
             # Training data (faded)
             ax.scatter(data[mask_0, 0], data[mask_0, 1], c="gray", alpha=0.15, s=5)
@@ -108,8 +125,9 @@ def plot_temperature_comparison(
                 bbox=dict(boxstyle="round", facecolor=box_color, alpha=0.8),
             )
 
-            ax.set_xlim(xlim)
-            ax.set_ylim(ylim)
+            cl = col_limits[col_idx]
+            ax.set_xlim(cl)
+            ax.set_ylim(cl)
             ax.set_aspect("equal")
             ax.grid(True, alpha=0.3)
             ax.set_xticks([])
