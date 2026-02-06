@@ -59,6 +59,10 @@ outputs/flow_gaussians/*/*
 outputs/flow_gaussians/*/visualizations/*
 !outputs/flow_gaussians/*/visualizations/*.gif
 !outputs/flow_gaussians/*/visualizations/*.png
+!outputs/flow_gaussians/*/temperature_scaling/
+outputs/flow_gaussians/*/temperature_scaling/*
+!outputs/flow_gaussians/*/temperature_scaling/*.gif
+!outputs/flow_gaussians/*/temperature_scaling/*.png
 !outputs/flow_gaussians/*/visualizations/*/
 outputs/flow_gaussians/*/visualizations/*/*
 !outputs/flow_gaussians/*/visualizations/*/*.gif
