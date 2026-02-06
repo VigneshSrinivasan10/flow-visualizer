@@ -48,8 +48,8 @@ class TemperatureScaledCFGModel:
             t = torch.ones(n_samples, device=self.device) * (step / n_steps)
             v = self.velocity_net.forward_cfg(x, time=t, class_labels=class_labels,
                                               guidance_scale=guidance_scale)
-            # Temperature scaling: divide velocity by temperature factor
-            v = v / temperature
+            # Temperature scaling: multiply velocity by temperature (<1 = more concentrated)
+            v = v * temperature
             x = x + v * dt
 
         return x.cpu()
@@ -67,8 +67,8 @@ class TemperatureScaledCFGModel:
             t = torch.ones(n_samples, device=self.device) * (step / n_steps)
             v = self.velocity_net.forward_cfg(x, time=t, class_labels=class_labels,
                                               guidance_scale=guidance_scale)
-            # Temperature scaling: divide velocity by temperature factor
-            v = v / temperature
+            # Temperature scaling: multiply velocity by temperature (<1 = more concentrated)
+            v = v * temperature
             x = x + v * dt
             trajectory.append(x.cpu().clone())
 
@@ -165,7 +165,7 @@ def create_temperature_trajectory_animation(
             ax.scatter(path[frame, 0], path[frame, 1], s=30, color=color,
                        edgecolors="black", linewidth=0.5, zorder=10)
 
-        title = f"Temperature = 1/{temperature:.1f} (CFG = {guidance_scale:.0f})"
+        title = f"Temperature = {temperature:.1f} (CFG = {guidance_scale:.0f})"
         ax.set_title(title, fontsize=14, fontweight="bold")
         ax.set_xlim(-4.5, 4.5)
         ax.set_ylim(-2.8, 2)
@@ -273,7 +273,7 @@ def create_temperature_probability_path(
         ax.text(-x_offset, 2.4, "Source", ha="center", fontsize=11, fontweight="bold")
         ax.text(x_offset, 2.4, "Target", ha="center", fontsize=11, fontweight="bold")
 
-        title = f"Probability Path: Temperature = 1/{temperature:.1f}"
+        title = f"Probability Path: Temperature = {temperature:.1f}"
         ax.set_title(title, fontsize=14, fontweight="bold")
         ax.set_xlim(-5, 5)
         ax.set_ylim(-3, 3)
@@ -351,7 +351,7 @@ def plot_temperature_comparison(
         ax.set_xlim(-2, 2)
         ax.set_ylim(-1, 2)
         ax.set_aspect('equal')
-        ax.set_title(f"T = 1/{temp:.1f}", fontsize=12, fontweight='bold')
+        ax.set_title(f"T = {temp}", fontsize=12, fontweight='bold')
         ax.set_xticks([])
         ax.set_yticks([])
         ax.grid(True, alpha=0.2)
@@ -413,10 +413,10 @@ def main(cfg: DictConfig) -> None:
     # Parameters
     n_vis_samples = min(2000, cfg.data.n_samples)
     n_per_class = n_vis_samples // 2
-    guidance_scale = cfg.visualization.get("guidance_scale", 2.0)
+    guidance_scale = 1.0
 
-    # Temperature values to test (dividing velocity by these values)
-    temperature_values = [1.0, 1.5, 2.0, 3.0, 5.0]
+    # Temperature values: <1 = more concentrated, 1 = baseline
+    temperature_values = [0.2, 0.4, 0.6, 0.8, 1.0]
 
     # Create class labels
     class_labels = torch.cat([
