@@ -171,7 +171,7 @@ def main(cfg: DictConfig) -> None:
     viz_dir.mkdir(parents=True, exist_ok=True)
 
     # Temperature values: <1 = more concentrated, 1 = baseline, >1 = more spread
-    temperature_values = [0.2, 0.4, 0.6, 0.8, 1.0]
+    temperature_values = [0.2, 0.4, 0.6, 0.8, 1.0, 2.0, 3.0, 4.0, 5.0]
     cfg_scale = 1.0
     n_samples = cfg.visualization.get("n_samples", 500)
 

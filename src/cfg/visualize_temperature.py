@@ -415,8 +415,8 @@ def main(cfg: DictConfig) -> None:
     n_per_class = n_vis_samples // 2
     guidance_scale = 1.0
 
-    # Temperature values: <1 = more concentrated, 1 = baseline
-    temperature_values = [0.2, 0.4, 0.6, 0.8, 1.0]
+    # Temperature values: <1 = more concentrated, 1 = baseline, >1 = more spread
+    temperature_values = [0.2, 0.4, 0.6, 0.8, 1.0, 2.0, 3.0, 4.0, 5.0]
 
     # Create class labels
     class_labels = torch.cat([
