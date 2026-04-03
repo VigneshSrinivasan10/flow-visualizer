@@ -413,7 +413,7 @@ def main(cfg: DictConfig) -> None:
     # Parameters
     n_vis_samples = min(2000, cfg.data.n_samples)
     n_per_class = n_vis_samples // 2
-    guidance_scale = 1.0
+    guidance_scale = 0.0
 
     # Temperature values: <1 = more concentrated, 1 = baseline, >1 = more spread
     temperature_values = [0.2, 0.4, 0.6, 0.8, 1.0, 2.0, 3.0, 4.0, 5.0]
@@ -436,42 +436,6 @@ def main(cfg: DictConfig) -> None:
         save_path=output_dir / "temperature_comparison.png",
         dpi=150,
     )
-
-    # 2. Generate trajectory and probability path animations for each temperature
-    for temp in temperature_values:
-        logger.info(f"Generating visualizations for temperature = 1/{temp}...")
-
-        trajectory = model.sample_trajectory(
-            n_samples=n_vis_samples,
-            class_labels=class_labels,
-            n_steps=cfg.visualization.n_sampling_steps,
-            guidance_scale=guidance_scale,
-            temperature=temp,
-        )
-
-        # Trajectory animation
-        create_temperature_trajectory_animation(
-            trajectory,
-            class_labels_cpu,
-            output_dir / f"trajectory_temp_{temp:.1f}.gif",
-            temperature=temp,
-            guidance_scale=guidance_scale,
-            n_particles=cfg.visualization.get("n_particles", 100),
-            fps=cfg.visualization.get("animation_fps", 20),
-            dpi=cfg.visualization.get("animation_dpi", 100),
-        )
-
-        # Probability path animation
-        create_temperature_probability_path(
-            trajectory,
-            class_labels_cpu,
-            output_dir / f"probability_path_temp_{temp:.1f}.gif",
-            temperature=temp,
-            guidance_scale=guidance_scale,
-            fps=cfg.visualization.get("animation_fps", 20),
-            dpi=cfg.visualization.get("animation_dpi", 100),
-            grid_size=cfg.visualization.get("density_grid_size", 100),
-        )
 
     logger.info(f"Temperature-scaled visualization complete! Outputs in {output_dir}")
 
